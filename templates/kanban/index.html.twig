@@ -1,0 +1,36 @@
+{# templates/kanban/index.html.twig #}
+{% extends 'base.html.twig' %}
+
+{% block title %}Kanban Boards{% endblock %}
+
+{% block body %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Twoje tablice Kanban</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for board in boards %}
+            <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative">
+                <h3 class="text-lg font-semibold mb-2">{{ board.name }}</h3>
+                <p class="text-gray-600 text-sm mb-4">{{ board.cols|length }} kolumn</p>
+                <a href="{{ path('kanban_board', {id: board.id}) }}"
+                   class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors block text-center">
+                    Otwórz tablicę
+                </a>
+                {# Przycisk do usuwania tablicy #}
+                <button data-action="click->modal#deleteBoard"
+                        data-board-id="{{ board.id }}"
+                        data-board-name="{{ board.name }}"
+                        class="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+        {% else %}
+            <div class="col-span-full text-center py-12">
+                <p class="text-gray-500 text-lg">Brak tablic. Utwórz pierwszą tablicę!</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
