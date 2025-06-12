@@ -1,43 +1,141 @@
-/* Base style for kanban-col, derived from your existing Twig classes */
+/* Base style for kanban-col */
 .kanban-col {
-    background-color: #f9fafb; /* bg-gray-100 */
-    border-radius: 8px; /* rounded-lg */
-    padding: 16px; /* p-4 */
-    min-width: 320px; /* min-w-80 */
+    background-color: #ebecf0; /* Bardziej zbliżony do tła kolumn w Trello */
+    border-radius: 3px; /* Mniej zaokrąglone rogi, jak w Trello */
+    padding: 8px; /* Mniejsze paddingi */
+    min-width: 272px; /* Standardowa szerokość kolumny Trello */
+    max-height: calc(100vh - 120px); /* Ograniczenie wysokości, aby była scrollowalna */
+    overflow-y: auto; /* Scroll dla długich list */
     flex-shrink: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* shadow-sm */
+    box-shadow: 0 1px 0 rgba(9,30,66,.25); /* Subtelny cień na dole */
     transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    border: 1px solid transparent; /* Dodajemy transparentną ramkę, aby uniknąć skoku przy dodawaniu bordera */
+    border: 1px solid transparent;
 }
 
 /* Styl dla kolumny, na którą najechano przeciąganym zadaniem */
 .kanban-col.drag-over {
-    background-color: #eff6ff; /* Np. blue-50 */
-    border-color: #93c5fd; /* Np. blue-300 */
-    border-style: dashed;
+    background-color: #e0e0e0; /* Delikatnie ciemniejsze tło podczas przeciągania */
+    border-color: #0079bf; /* Typowy niebieski Trello */
+    border-style: solid; /* Zamiast dashed, bardziej jak Trello */
     border-width: 2px;
-    box-shadow: 0 0 10px rgba(147, 197, 253, 0.5); /* Lekki cień */
+    box-shadow: 0 0 8px rgba(0, 121, 191, 0.4); /* Niebieskawy cień */
 }
 
-/* Styl dla przeciąganego elementu */
+/* --- ZMIANA TUTAJ: STYL DLA PRZENOSZONEGO ELEMENTU --- */
 .kanban-task.dragging {
-    opacity: 0.5;
-    /* Możesz dodać więcej stylów, np. delikatny cień, aby wyróżnić przeciągany element */
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    /* Usunięto opacity, by element był w pełni widoczny */
+    opacity: 0.8;
+    box-shadow: 0 8px 16px -4px rgba(9,30,66,.25), 0 0 0 1px rgba(9,30,66,.08); /* Wyraźniejszy, "pływający" cień */
+    transform: rotate(2deg); /* Lekki obrót, jak w Trello */
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
-/* Dodaj jeśli jeszcze nie masz (zgodnie z poprzednimi sugestiami) */
+/* Jeśli chcesz, aby oryginalne miejsce było zaznaczone, możesz dodać styl do "placeholder" */
+/* np. .kanban-task-placeholder { border: 2px dashed #ccc; height: 50px; margin-bottom: 8px; } */
+
+/* Dodaj jeśli jeszcze nie masz */
 .kanban-board {
     display: flex;
-    gap: 16px; /* spacing-x-4 w Tailwind */
+    gap: 8px;
+    padding: 8px;
+    overflow-x: auto;
+    height: 100%;
+    align-items: flex-start;
 }
 
 .kanban-task {
-    /* Upewnij się, że masz te style, pochodzą z Twig */
-    background-color: #ffffff; /* bg-white */
-    padding: 16px; /* p-4 */
-    border-radius: 8px; /* rounded-lg */
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* shadow-sm */
+    background-color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(9,30,66,.25);
     cursor: grab;
-    transition: shadow 0.2s ease-in-out;
+    transition: box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out;
+    margin-bottom: 8px;
+    word-wrap: break-word;
+}
+
+.kanban-task:hover {
+    background-color: #f4f5f7;
+    box-shadow: 0 2px 4px rgba(9,30,66,.25), 0 0 0 1px rgba(9,30,66,.08);
+}
+
+/* Styl dla scrollbara w kolumnach (Webkit - Chrome, Safari) */
+.kanban-col::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.kanban-col::-webkit-scrollbar-thumb {
+    background-color: #c4c9cc;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.kanban-col::-webkit-scrollbar-thumb:hover {
+    background-color: #97a0af;
+}
+
+.kanban-col::-webkit-scrollbar-track {
+    background: #ebecf0;
+    border-radius: 4px;
+}
+
+/* Styl dla nagłówka kolumny */
+.kanban-col-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #172b4d;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+/* Styl dla przycisku "Dodaj zadanie" w kolumnie */
+.add-task-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 6px 8px;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    color: #5e6c84;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    margin-top: 4px;
+}
+
+.add-task-button:hover {
+    background-color: #dcdfe4;
+    color: #172b4d;
+}
+
+/* Ikona plusa dla przycisku dodawania zadania */
+.add-task-button svg {
+    margin-right: 4px;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+/* Styl dla nagłówka zadania (h4) */
+.kanban-task h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #172b4d;
+    margin-bottom: 4px;
+}
+
+/* Styl dla opisu zadania (p) */
+.kanban-task p {
+    font-size: 13px;
+    color: #5e6c84;
+    line-height: 1.4;
+}
+
+/* Ogólne tło strony */
+body {
+    background-color: #0079bf; /* Typowy niebieski tle Trello */
 }

@@ -6,6 +6,7 @@ use App\Repository\ColRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert; // Dodaj tę linię
 
 #[ORM\Entity(repositoryClass: ColRepository::class)]
 class Col
@@ -16,16 +17,19 @@ class Col
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: "Nazwa kolumny nie może być pusta.")] // Dodaj tę linię
+    #[Assert\Length(min: 3, max: 255, minMessage: "Nazwa kolumny musi mieć co najmniej {{ limit }} znaki.", maxMessage: "Nazwa kolumny może mieć maksymalnie {{ limit }} znaków.")] // Dodaj tę linię
     private ?string $name = null;
 
     #[ORM\Column]
+    #[Assert\NotNull(message: "Pozycja kolumny nie może być pusta.")] // Dodaj tę linię
     private ?int $position = null;
 
     #[ORM\ManyToOne(inversedBy: 'cols')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Board $board = null;
 
-    #[ORM\OneToMany(mappedBy: 'col', targetEntity: Task::class, orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'col', targetEntity: Task::class, orphanRemoval: true, cascade: ['remove'])]
     #[ORM\OrderBy(['position' => 'ASC'])]
     private Collection $tasks;
 
@@ -92,6 +96,7 @@ class Col
     public function removeTask(Task $task): static
     {
         if ($this->tasks->removeElement($task)) {
+            // set the owning side to null (unless already changed)
             if ($task->getCol() === $this) {
                 $task->setCol(null);
             }

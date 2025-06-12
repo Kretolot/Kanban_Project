@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Board;
 use App\Entity\Col;
 use App\Entity\Task;
+use App\Entity\User;
 use App\Repository\BoardRepository;
 use App\Repository\ColRepository;
 use App\Repository\TaskRepository;
@@ -14,7 +15,10 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 class KanbanController extends AbstractController
 {
     private array $defaultColNames = ['Do zrobienia', 'W trakcie', 'Ukończone'];
@@ -26,31 +30,70 @@ class KanbanController extends AbstractController
         private TaskRepository $taskRepository
     ) {}
 
-    #[Route('/', name: 'app_home')]
+    #[Route('/home', name: 'app_home')]
     public function index(): Response
     {
-        $boards = $this->boardRepository->findAll();
+        /** @var User $user */
+        $user = $this->getUser();
+        $boards = $this->boardRepository->findBy(['owner' => $user]);
+
         return $this->render('kanban/index.html.twig', [
             'boards' => $boards,
         ]);
     }
 
-    // NOWA FUNKCJONALNOŚĆ: DODAWANIE NOWEJ TABLICY
-    // Ta trasa musi być przed trasą '/board/{id}'
     #[Route('/board/add', name: 'kanban_add_board', methods: ['POST'])]
-    public function addBoard(Request $request): Response
+    public function addBoard(Request $request, ValidatorInterface $validator): Response
     {
-        $boardName = $request->request->get('name');
+        /** @var User $user */
+        $user = $this->getUser(); // Pobierz zalogowanego użytkownika
 
-        if (!$boardName) {
+        // --- ZMIANA TUTAJ: POBIERANIE DANYCH Z JSON ---
+        $data = json_decode($request->getContent(), true);
+        $boardName = $data['name'] ?? null; // Odczytaj 'name' z zdekodowanego JSON
+
+        // Dodatkowa walidacja przed stworzeniem obiektu Board
+        if (null === $boardName || empty(trim($boardName))) {
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nazwa tablicy nie może być pusta.']], JsonResponse::HTTP_BAD_REQUEST);
+            }
             $this->addFlash('error', 'Nazwa tablicy nie może być pusta.');
             return $this->redirectToRoute('app_home');
         }
 
+        if (mb_strlen($boardName) > 255) { // Przykład walidacji długości
+             if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nazwa tablicy jest za długa (maks. 255 znaków).']], JsonResponse::HTTP_BAD_REQUEST);
+            }
+            $this->addFlash('error', 'Nazwa tablicy jest za długa (maks. 255 znaków).');
+            return $this->redirectToRoute('app_home');
+        }
+        // --- KONIEC ZMIANY W POBIERANIU DANYCH ---
+
         $board = new Board();
         $board->setName($boardName);
+        $board->setOwner($user);
+
+        $errors = $validator->validate($board);
+
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[] = $error->getMessage();
+            }
+
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+            } else {
+                foreach ($errors as $error) {
+                    $this->addFlash('error', $error->getMessage());
+                }
+                return $this->redirectToRoute('app_home');
+            }
+        }
+
         $this->entityManager->persist($board);
-        $this->entityManager->flush(); // Flush now to get the board ID for cols
+        $this->entityManager->flush();
 
         foreach ($this->defaultColNames as $position => $colName) {
             $col = new Col();
@@ -62,13 +105,28 @@ class KanbanController extends AbstractController
 
         $this->entityManager->flush();
 
-        $this->addFlash('success', 'Nowa tablica "' . $boardName . '" została dodana z domyślnymi listami!');
-        return $this->redirectToRoute('app_home');
+        // Zmieniono kod statusu na 201 Created dla pomyślnego utworzenia zasobu
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Nowa tablica "' . $boardName . '" została dodana z domyślnymi listami!',
+                'redirect' => $this->generateUrl('app_home')
+            ], JsonResponse::HTTP_CREATED);
+        } else {
+            $this->addFlash('success', 'Nowa tablica "' . $boardName . '" została dodana z domyślnymi listami!');
+            return $this->redirectToRoute('app_home');
+        }
     }
 
-    #[Route('/board/{id}', name: 'kanban_board', methods: ['GET'])] // Dodano methods: ['GET']
+    #[Route('/board/{id}', name: 'kanban_board', methods: ['GET'])]
     public function board(Board $board): Response
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($board->getOwner() !== $user) {
+            throw $this->createAccessDeniedException('Nie masz dostępu do tej tablicy.');
+        }
+
         return $this->render('kanban/board.html.twig', [
             'board' => $board,
         ]);
@@ -77,42 +135,50 @@ class KanbanController extends AbstractController
     #[Route('/board/{id}', name: 'kanban_delete_board', methods: ['DELETE'])]
     public function deleteBoard(Board $board): JsonResponse
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($board->getOwner() !== $user) {
+            return new JsonResponse(['error' => 'Nie masz uprawnień do usunięcia tej tablicy.'], JsonResponse::HTTP_FORBIDDEN); // Użycie stałej HTTP
+        }
+
         $canDelete = true;
         foreach ($board->getCols() as $col) {
-            // Sprawdzamy tylko kolumny, które NIE są "Ukończone"
             if ($col->getName() !== 'Ukończone' && $col->getTasks()->count() > 0) {
                 $canDelete = false;
-                break; // Znaleziono zadanie poza kolumną "Ukończone", więc nie można usunąć
+                break;
             }
         }
 
         if (!$canDelete) {
-            return new JsonResponse(['error' => 'Nie można usunąć tablicy, ponieważ zawiera zadania poza listą "Ukończone". Przenieś wszystkie zadania do listy "Ukończone" lub usuń je.'], 400);
+            return new JsonResponse(['error' => 'Nie można usunąć tablicy, ponieważ zawiera zadania poza listą "Ukończone". Przenieś wszystkie zadania do listy "Ukończone" lub usuń je.'], JsonResponse::HTTP_BAD_REQUEST); // Użycie stałej HTTP
         }
 
-        // Jeśli wszystkie zadania są w kolumnie "Ukończone" (lub nie ma zadań w ogóle),
-        // usuwamy zadania w kolumnie "Ukończone" przed usunięciem kolumn i tablicy.
-        foreach ($board->getCols() as $col) {
-            foreach ($col->getTasks() as $task) {
-                $this->entityManager->remove($task);
-            }
-            $this->entityManager->remove($col); // Usuń kolumnę po usunięciu jej zadań
-        }
-        $this->entityManager->remove($board);
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->remove($board);
+            $this->entityManager->flush();
 
-        return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('app_home')]);
+            $this->addFlash('success', 'Tablica "' . $board->getName() . '" została pomyślnie usunięta.');
+            return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('app_home')], JsonResponse::HTTP_OK); // Użycie stałej HTTP
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Wystąpił błąd podczas usuwania tablicy: ' . $e->getMessage());
+            return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania tablicy: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR); // Użycie stałej HTTP
+        }
     }
-
 
     #[Route('/task/{id}/move', methods: ['PATCH'])]
     public function moveTask(Task $task, Request $request): JsonResponse
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($task->getCol()->getBoard()->getOwner() !== $user) {
+            return new JsonResponse(['error' => 'Nie masz uprawnień do przeniesienia tego zadania.'], JsonResponse::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
         $newCol = $this->colRepository->find($data['colId']);
 
-        if (!$newCol) {
-            return new JsonResponse(['error' => 'Column not found'], 404);
+        if (!$newCol || $newCol->getBoard()->getOwner() !== $user) {
+            return new JsonResponse(['error' => 'Kolumna nie została znaleziona lub nie należy do Twoich tablic.'], JsonResponse::HTTP_NOT_FOUND);
         }
 
         $task->setCol($newCol);
@@ -123,37 +189,97 @@ class KanbanController extends AbstractController
 
         $this->entityManager->flush();
 
-        return new JsonResponse(['status' => 'success']);
+        return new JsonResponse(['status' => 'success'], JsonResponse::HTTP_OK);
     }
 
-    #[Route('/board/{id}/task/add', methods: ['POST'])]
-    public function addTask(Board $board, Request $request): Response
+    #[Route('/board/{id}/task/add', name: 'kanban_add_task', methods: ['POST'])]
+    public function addTask(Board $board, Request $request, ValidatorInterface $validator): Response
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($board->getOwner() !== $user) {
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nie masz uprawnień do dodania zadania do tej tablicy.']], JsonResponse::HTTP_FORBIDDEN);
+            }
+            throw $this->createAccessDeniedException('Nie masz uprawnień do dodania zadania do tej tablicy.');
+        }
+
+        // --- ZMIANA TUTAJ: POBIERANIE DANYCH Z JSON (dla Task, jeśli też wysyłasz JSON) ---
+        // Jeśli formularz dodawania zadań nadal wysyła form-data, pozostaw poniższe linijki bez zmian:
         $title = $request->request->get('title');
         $description = $request->request->get('description');
         $colId = $request->request->get('col_id');
+        // Jeśli wysyłasz JSON dla zadań, zmień to na:
+        /*
+        $data = json_decode($request->getContent(), true);
+        $title = $data['title'] ?? null;
+        $description = $data['description'] ?? null;
+        $colId = $data['col_id'] ?? null;
+        */
+        // --- KONIEC ZMIANY W POBIERANIU DANYCH DLA ZADANIA ---
 
         $col = $this->colRepository->find($colId);
 
         if (!$col || $col->getBoard() !== $board) {
-            throw $this->createNotFoundException('Column not found');
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Kolumna nie została znaleziona lub nie należy do tej tablicy.']], JsonResponse::HTTP_NOT_FOUND);
+            }
+            throw $this->createNotFoundException('Kolumna nie została znaleziona lub nie należy do tej tablicy.');
         }
 
         $task = new Task();
         $task->setTitle($title);
         $task->setDescription($description);
         $task->setCol($col);
-        $task->setPosition($col->getTasks()->count()); // Ustawia pozycję na końcu listy
+        $task->setPosition($col->getTasks()->count());
+
+        $errors = $validator->validate($task);
+
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[] = $error->getMessage();
+            }
+
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+            } else {
+                foreach ($errors as $error) {
+                    $this->addFlash('error', $error->getMessage());
+                }
+                return $this->redirectToRoute('kanban_board', ['id' => $board->getId()]);
+            }
+        }
 
         $this->entityManager->persist($task);
         $this->entityManager->flush();
 
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Zadanie dodane pomyślnie!',
+                'redirect' => $this->generateUrl('kanban_board', ['id' => $board->getId()])
+            ], JsonResponse::HTTP_CREATED); // Użycie stałej HTTP
+        }
         return $this->redirectToRoute('kanban_board', ['id' => $board->getId()]);
     }
 
-    #[Route('/task/{id}/edit', methods: ['POST'])] // Zmieniamy na POST, bo używamy _method=PUT
-    public function editTask(Task $task, Request $request): Response
+    #[Route('/task/{id}/edit', name: 'kanban_edit_task', methods: ['POST'])]
+    public function editTask(Task $task, Request $request, ValidatorInterface $validator): Response
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($task->getCol()->getBoard()->getOwner() !== $user) {
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nie masz uprawnień do edycji tego zadania.']], JsonResponse::HTTP_FORBIDDEN);
+            }
+            throw $this->createAccessDeniedException('Nie masz uprawnień do edycji tego zadania.');
+        }
+
+        // --- ZMIANA TUTAJ: Obsługa PUT/PATCH dla danych JSON w zależności od potrzeb ---
+        // W przypadku edycji, jeśli _method jest PUT (simulowane POST)
+        // I jeśli wysyłasz JSON, musisz użyć json_decode($request->getContent(), true)
+        // Poniżej założono, że nadal wysyłasz dane jako form-data, ale z symulacją PUT
         if ($request->request->get('_method') === 'PUT') {
             $title = $request->request->get('title');
             $description = $request->request->get('description');
@@ -161,21 +287,62 @@ class KanbanController extends AbstractController
             $task->setTitle($title);
             $task->setDescription($description);
 
+            $errors = $validator->validate($task);
+
+            if (count($errors) > 0) {
+                $errorMessages = [];
+                foreach ($errors as $error) {
+                    $errorMessages[] = $error->getMessage();
+                }
+
+                if ($request->isXmlHttpRequest()) {
+                    return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+                } else {
+                    foreach ($errors as $error) {
+                        $this->addFlash('error', $error->getMessage());
+                    }
+                    return $this->redirectToRoute('kanban_board', ['id' => $task->getCol()->getBoard()->getId()]);
+                }
+            }
+
             $this->entityManager->flush();
 
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse([
+                    'success' => true,
+                    'message' => 'Zadanie zaktualizowane pomyślnie!',
+                    'redirect' => $this->generateUrl('kanban_board', ['id' => $task->getCol()->getBoard()->getId()])
+                ], JsonResponse::HTTP_OK); // Użycie stałej HTTP
+            }
             return $this->redirectToRoute('kanban_board', ['id' => $task->getCol()->getBoard()->getId()]);
         }
+        // --- KONIEC ZMIANY DLA EDYCJI ZADANIA ---
 
-        throw $this->createNotFoundException('Invalid request method');
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse(['success' => false, 'errors' => ['Nieprawidłowa metoda żądania.']], JsonResponse::HTTP_METHOD_NOT_ALLOWED); // Użycie stałej HTTP
+        }
+        throw $this->createNotFoundException('Invalid request method'); // Zmieniono na bardziej ogólny błąd
     }
 
-    #[Route('/task/{id}', methods: ['DELETE'])]
+    #[Route('/task/{id}', name: 'kanban_delete_task', methods: ['DELETE'])]
     public function deleteTask(Task $task): JsonResponse
     {
-        $boardId = $task->getCol()->getBoard()->getId(); // Zachowaj ID tablicy do przekierowania
-        $this->entityManager->remove($task);
-        $this->entityManager->flush();
+        /** @var User $user */
+        $user = $this->getUser();
+        if ($task->getCol()->getBoard()->getOwner() !== $user) {
+            return new JsonResponse(['error' => 'Nie masz uprawnień do usunięcia tego zadania.'], JsonResponse::HTTP_FORBIDDEN);
+        }
 
-        return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])]);
+        try {
+            $boardId = $task->getCol()->getBoard()->getId();
+            $this->entityManager->remove($task);
+            $this->entityManager->flush();
+
+            $this->addFlash('success', 'Zadanie zostało pomyślnie usunięte.');
+            return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])], JsonResponse::HTTP_OK);
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Wystąpił błąd podczas usuwania zadania: ' . $e->getMessage());
+            return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania zadania: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

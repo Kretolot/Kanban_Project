@@ -12,7 +12,7 @@
 <div data-controller="drag-drop" class="flex space-x-4 overflow-x-auto pb-4">
     {% for col in board.cols %}
         <div class="bg-gray-100 rounded-lg p-4 min-w-80 flex-shrink-0"
-             data-drag-drop-target="column" {# Target Stimulusa dla całej kolumny #}
+             data-drag-drop-target="column"
              data-col-id="{{ col.id }}">
 
             <div class="flex justify-between items-center mb-4">
@@ -28,15 +28,13 @@
                 + Dodaj zadanie
             </button>
 
-            {# Nowy kontener dla zadań, który będzie celem upuszczania #}
-            {# Dodano `data-drag-drop-target="tasksContainer"` i `min-h-32` aby obszar był klikalny #}
             <div class="space-y-3 min-h-32" data-drag-drop-target="tasksContainer">
                 {% for task in col.tasks %}
                     <div class="bg-white p-4 rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-400 kanban-task"
-                         data-drag-drop-target="card" {# Target Stimulusa dla pojedynczej karty #}
+                         data-drag-drop-target="card"
                          data-task-id="{{ task.id }}"
-                         data-col-id="{{ col.id }}" {# Dodaj ID kolumny do karty dla łatwego dostępu w JS #}
-                         data-action="click->modal#openEditModal"> {# Usunięto draggable="true" i dragstart/dragend actions, bo to obsłuży kontroler #}
+                         data-col-id="{{ col.id }}"
+                         data-action="click->modal#openEditModal">
                         <h4 class="font-semibold text-gray-800 mb-2">{{ task.title }}</h4>
                         {% if task.description %}
                             <p class="text-sm text-gray-600 line-clamp-3">{{ task.description }}</p>
@@ -51,7 +49,6 @@
     {% endfor %}
 </div>
 
-{# Modale pozostają bez zmian - wklej resztę twoich modalów tutaj, jeśli pominąłem #}
 {# Modal do dodawania zadań #}
 <div data-modal-target="modal"
      class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
@@ -60,7 +57,7 @@
 
         <form data-modal-target="form"
               data-action="submit->modal#submitForm"
-              action="{{ path('kanban_board', {id: board.id}) }}/task/add"
+              action="{{ path('kanban_add_task', {id: board.id}) }}"
               method="post">
 
             <input type="hidden" name="col_id" data-modal-target="colIdInput">
@@ -76,6 +73,8 @@
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                        placeholder="Wprowadź tytuł zadania">
             </div>
+            {# Kontener na błędy walidacji #}
+            <div data-modal-target="taskErrors" class="text-red-600 text-sm mb-4"></div>
 
             <div class="mb-6">
                 <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
@@ -127,6 +126,8 @@
                        data-modal-target="editTitle"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+            {# Kontener na błędy walidacji #}
+            <div data-modal-target="editTaskErrors" class="text-red-600 text-sm mb-4"></div>
 
             <div class="mb-6">
                 <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-2">

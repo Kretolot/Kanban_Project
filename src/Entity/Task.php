@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\TaskRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert; // Dodaj tę linię
 
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 class Task
@@ -15,16 +16,21 @@ class Task
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: "Tytuł zadania nie może być pusty.")] // Dodaj tę linię
+    #[Assert\Length(min: 3, max: 255, minMessage: "Tytuł zadania musi mieć co najmniej {{ limit }} znak.", maxMessage: "Tytuł zadania może mieć maksymalnie {{ limit }} znaków.")] // Dodaj tę linię
     private ?string $title = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 1000, maxMessage: "Opis zadania może mieć maksymalnie {{ limit }} znaków.")] // Dodaj tę linię
     private ?string $description = null;
 
     #[ORM\ManyToOne(inversedBy: 'tasks')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Assert\NotNull(message: "Zadanie musi być przypisane do kolumny.")] // Dodaj tę linię
     private ?Col $col = null;
 
     #[ORM\Column]
+    #[Assert\NotNull(message: "Pozycja zadania nie może być pusta.")] // Dodaj tę linię
     private ?int $position = null;
 
     #[ORM\Column]

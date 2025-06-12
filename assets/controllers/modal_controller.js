@@ -1,192 +1,303 @@
-// assets/controllers/modal_controller.js
-import { Controller } from "@hotwired/stimulus"
+import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ["modal", "form", "colIdInput", "editModal", "editForm", "editTaskId", "editTitle", "editDescription", "addBoardModal", "addBoardForm"]
-    
-    connect() {
-        // Dodajemy event listener do zamykania modala po kliknięciu poza nim
-        this.modalTarget.addEventListener('click', this.closeOnBackdrop.bind(this));
-        this.editModalTarget.addEventListener('click', this.closeOnBackdrop.bind(this));
-        
-        // Sprawdź, czy addBoardModal istnieje przed dodaniem listenera (jest w base.html.twig)
-        if (this.hasAddBoardModalTarget) {
-            this.addBoardModalTarget.addEventListener('click', this.closeOnBackdrop.bind(this));
-        }
+    static targets = [
+        // Modal dodawania zadania
+        "modal", // Główny kontener modala dodawania zadania
+        "form", // Formularz dodawania zadania
+        "colIdInput", // Ukryte pole input do ID kolumny
+        "taskErrors", // Kontener na błędy dodawania zadania
 
-        // Dodaj event listenery do kliknięcia na karty zadań, aby otworzyć modal edycji
-        // Sprawdź, czy element zawiera targety kart (jest tylko na stronie board)
-        if (this.element.hasAttribute('data-drag-drop-target')) { // Sprawdzamy czy to element board
-            this.element.querySelectorAll('[data-drag-drop-target="card"]').forEach(card => {
-                card.addEventListener('click', this.openEditModal.bind(this));
-            });
+        // Modal edycji zadania
+        "editModal", // Główny kontener modala edycji zadania
+        "editForm", // Formularz edycji zadania
+        "editTaskId", // Ukryte pole input do ID zadania
+        "editTitle", // Pole tytułu zadania
+        "editDescription", // Pole opisu zadania
+        "editTaskErrors", // Kontener na błędy edycji zadania
+
+        // Modal dodawania tablicy - Upewnij się, że 'modal' odnosi się do GŁÓWNEGO kontenera modala
+        // W twoim HTML modal dodawania tablicy ma data-modal-target="modal", więc nie potrzebujesz osobnego targetu dla niego.
+        // ALE: formularz w środku MUSI mieć unikalny target.
+        // Tutaj 'addBoardForm' jest poprawne, ponieważ zmieniliśmy to w HTML.
+        "addBoardForm", // Formularz dodawania tablicy
+        "addBoardErrors" // Kontener na błędy dodawania tablicy
+    ];
+
+    connect() {
+        console.log('Modal controller connected');
+        // Ukryj modale na start, ale TYLKO jeśli dany modal istnieje w DOM
+        if (this.hasModalTarget) { // Dotyczy modala dodawania zadania LUB dodawania tablicy (jeśli ma data-modal-target="modal")
+            this.modalTarget.classList.add('hidden');
+            this.modalTarget.classList.remove('flex');
+            // Resetowanie formularza dodawania zadania i jego błędów
+            if (this.hasFormTarget) {
+                this.formTarget.reset();
+            }
+            if (this.hasTaskErrorsTarget) {
+                this.clearErrors(this.taskErrorsTarget);
+            }
+            // Resetowanie formularza dodawania tablicy i jego błędów (bo używa tego samego głównego kontenera modala)
+            if (this.hasAddBoardFormTarget) { // Teraz to będzie działać poprawnie
+                this.addBoardFormTarget.reset();
+            }
+            if (this.hasAddBoardErrorsTarget) {
+                this.clearErrors(this.addBoardErrorsTarget);
+            }
+        }
+        if (this.hasEditModalTarget) { // Dotyczy modala edycji zadania
+            this.editModalTarget.classList.add('hidden');
+            this.editModalTarget.classList.remove('flex');
+            if (this.hasEditFormTarget) {
+                this.editFormTarget.reset();
+            }
+            if (this.hasEditTaskErrorsTarget) {
+                this.clearErrors(this.editTaskErrorsTarget);
+            }
         }
     }
 
-    // Modal do dodawania zadań
+    // Metody do modala dodawania zadania (bez zmian, działają poprawnie z 'form' targetem)
     open(event) {
-        const colId = event.target.dataset.colId;
-        this.colIdInputTarget.value = colId;
-
-        this.modalTarget.classList.remove('hidden');
-        this.modalTarget.classList.add('flex');
-
-        const firstInput = this.formTarget.querySelector('input[type="text"]');
-        if (firstInput) {
-            firstInput.focus();
+        if (this.hasColIdInputTarget && event.currentTarget.dataset.colId) {
+            this.colIdInputTarget.value = event.currentTarget.dataset.colId;
+        }
+        if (this.hasTaskErrorsTarget) {
+            this.clearErrors(this.taskErrorsTarget);
+        }
+        if (this.hasModalTarget) { // Odnosi się do głównego modala dla zadań
+            this.modalTarget.classList.remove('hidden');
+            this.modalTarget.classList.add('flex');
         }
     }
 
     close() {
-        this.modalTarget.classList.add('hidden');
-        this.modalTarget.classList.remove('flex');
-        this.formTarget.reset();
+        if (this.hasModalTarget) { // Odnosi się do głównego modala dla zadań
+            this.modalTarget.classList.add('hidden');
+            this.modalTarget.classList.remove('flex');
+        }
+        if (this.hasFormTarget) {
+            this.formTarget.reset();
+        }
+        if (this.hasTaskErrorsTarget) {
+            this.clearErrors(this.taskErrorsTarget);
+        }
     }
 
-    submitForm(event) {
-        event.preventDefault();
-
-        const formData = new FormData(this.formTarget);
-
-        fetch(this.formTarget.action, {
-            method: 'POST',
-            body: formData
-        }).then(response => {
-            if (response.ok) {
-                this.close();
-                location.reload();
-            } else {
-                console.error('Błąd podczas dodawania zadania');
-            }
-        }).catch(error => {
-            console.error('Błąd:', error);
-        });
-    }
-
-    // Modal do edycji/usuwania zadań
+    // Metody do modala edycji zadania (bez zmian)
     openEditModal(event) {
+        if (!this.hasEditModalTarget) {
+            console.error("Edit modal target not found.");
+            return;
+        }
+
         const card = event.currentTarget;
         const taskId = card.dataset.taskId;
-        const title = card.querySelector('h4').innerText;
-        const descriptionElement = card.querySelector('p');
-        const description = descriptionElement ? descriptionElement.innerText : '';
+        const title = card.querySelector('h4')?.innerText || '';
+        const description = card.querySelector('p')?.innerText || '';
 
-        this.editTaskIdTarget.value = taskId;
-        this.editTitleTarget.value = title;
-        this.editDescriptionTarget.value = description;
+        if (this.hasEditTaskIdTarget) this.editTaskIdTarget.value = taskId;
+        if (this.hasEditTitleTarget) this.editTitleTarget.value = title;
+        if (this.hasEditDescriptionTarget) this.editDescriptionTarget.value = description;
 
-        // Ustawiamy action formularza na odpowiednią ścieżkę do edycji
-        this.editFormTarget.action = `/task/${taskId}/edit`;
-
+        if (this.hasEditFormTarget) {
+            this.editFormTarget.action = `/task/${taskId}/edit`;
+        }
+        if (this.hasEditTaskErrorsTarget) {
+            this.clearErrors(this.editTaskErrorsTarget);
+        }
         this.editModalTarget.classList.remove('hidden');
         this.editModalTarget.classList.add('flex');
     }
 
     closeEditModal() {
-        this.editModalTarget.classList.add('hidden');
-        this.editModalTarget.classList.remove('flex');
-        this.editFormTarget.reset();
+        if (this.hasEditModalTarget) {
+            this.editModalTarget.classList.add('hidden');
+            this.editModalTarget.classList.remove('flex');
+        }
+        if (this.hasEditFormTarget) {
+            this.editFormTarget.reset();
+        }
+        if (this.hasEditTaskErrorsTarget) {
+            this.clearErrors(this.editTaskErrorsTarget);
+        }
     }
 
-    submitEditForm(event) {
+    // Metody do modala dodawania tablicy
+    openAddBoardModal() {
+        console.log('Metoda openAddBoardModal została wywołana!');
+        if (this.hasModalTarget) { // Używamy this.modalTarget, ponieważ główny div modala tablicy ma data-modal-target="modal"
+            this.modalTarget.classList.remove('hidden');
+            this.modalTarget.classList.add('flex');
+        }
+        if (this.hasAddBoardErrorsTarget) {
+            this.clearErrors(this.addBoardErrorsTarget);
+        }
+        if (this.hasAddBoardFormTarget) { // To jest teraz poprawne odwołanie
+            this.addBoardFormTarget.reset();
+        }
+    }
+
+    closeAddBoardModal() {
+        if (this.hasModalTarget) { // Używamy this.modalTarget, ponieważ główny div modala tablicy ma data-modal-target="modal"
+            this.modalTarget.classList.add('hidden');
+            this.modalTarget.classList.remove('flex');
+        }
+        if (this.hasAddBoardFormTarget) { // To jest teraz poprawne odwołanie
+            this.addBoardFormTarget.reset();
+        }
+        if (this.hasAddBoardErrorsTarget) {
+            this.clearErrors(this.addBoardErrorsTarget);
+        }
+    }
+
+    // Metoda do wyświetlania błędów w kontenerze
+    displayErrors(errorContainer, errors) {
+        errorContainer.innerHTML = '';
+        if (errors && errors.length > 0) {
+            const ul = document.createElement('ul');
+            ul.className = 'list-disc list-inside text-red-600';
+            errors.forEach(error => {
+                const li = document.createElement('li');
+                li.textContent = error;
+                ul.appendChild(li);
+            });
+            errorContainer.appendChild(ul);
+        }
+    }
+
+    // Metoda do czyszczenia błędów w kontenerze
+    clearErrors(errorContainer) {
+        errorContainer.innerHTML = '';
+    }
+
+    // Pozostawiamy submitForm bez zmian, ponieważ dotyczy formularza zadań
+    async submitForm(event) {
         event.preventDefault();
 
-        const formData = new FormData(this.editFormTarget);
-        const taskId = this.editTaskIdTarget.value;
-
-        fetch(this.editFormTarget.action, {
-            method: 'POST', // Zmieniamy na POST, ponieważ Symfony rozpoznaje _method=PUT
-            body: formData
-        }).then(response => {
-            if (response.ok) {
-                this.closeEditModal();
-                location.reload();
-            } else {
-                console.error('Błąd podczas edycji zadania');
-            }
-        }).catch(error => {
-            console.error('Błąd:', error);
-        });
-    }
-
-    async deleteTask() {
-        const taskId = this.editTaskIdTarget.value;
-        if (!confirm(`Czy na pewno chcesz usunąć zadanie (ID: ${taskId})?`)) {
+        if (!this.hasFormTarget) {
+            console.error("Missing form target for task form.");
             return;
         }
+        const form = this.formTarget;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(form.action, {
+                method: form.method,
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    window.location.reload();
+                }
+                this.close();
+            } else {
+                if (this.hasTaskErrorsTarget) {
+                    this.displayErrors(this.taskErrorsTarget, data.errors || ['Wystąpił nieznany błąd.']);
+                }
+            }
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            if (this.hasTaskErrorsTarget) {
+                this.displayErrors(this.taskErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
+            }
+        }
+    }
+
+    async submitEditForm(event) {
+        event.preventDefault();
+
+        if (!this.hasEditFormTarget || !this.hasEditTaskIdTarget) {
+            console.error("Missing targets for edit task form.");
+            return;
+        }
+        const form = this.editFormTarget;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(`/task/${this.editTaskIdTarget.value}/edit`, { // Użyj wartości z targetu bezpośrednio
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    window.location.reload();
+                }
+                this.closeEditModal();
+            } else {
+                if (this.hasEditTaskErrorsTarget) {
+                    this.displayErrors(this.editTaskErrorsTarget, data.errors || ['Wystąpił nieznany błąd.']);
+                }
+            }
+        } catch (error) {
+            console.error('Error submitting edit form:', error);
+            if (this.hasEditTaskErrorsTarget) {
+                this.displayErrors(this.editTaskErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
+            }
+        }
+    }
+
+    async deleteTask(event) {
+        event.preventDefault();
+        if (!confirm('Czy na pewno chcesz usunąć to zadanie?')) {
+            return;
+        }
+
+        if (!this.hasEditTaskIdTarget) {
+            console.error("Missing editTaskId target for deleting task.");
+            return;
+        }
+        const taskId = this.editTaskIdTarget.value;
 
         try {
             const response = await fetch(`/task/${taskId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Content-Type': 'application/json',
-                },
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
 
             const data = await response.json();
-            if (response.ok) {
-                this.closeEditModal();
+
+            if (data.status === 'success') {
                 if (data.redirect) {
                     window.location.href = data.redirect;
                 } else {
-                    location.reload();
+                    window.location.reload();
                 }
+                this.closeEditModal();
             } else {
-                console.error('Błąd podczas usuwania zadania:', data.error || 'Nieznany błąd');
-                alert(`Błąd podczas usuwania zadania: ${data.error || 'Nieznany błąd'}`);
+                alert('Błąd podczas usuwania zadania: ' + (data.error || 'Nieznany błąd.'));
             }
         } catch (error) {
-            console.error('Błąd:', error);
-            alert('Wystąpił błąd podczas usuwania zadania.');
+            console.error('Error deleting task:', error);
+            alert('Wystąpił błąd sieci lub serwera podczas usuwania zadania.');
         }
     }
 
-    // Modal do dodawania nowych tablic
-    openAddBoardModal() {
-        this.addBoardModalTarget.classList.remove('hidden');
-        this.addBoardModalTarget.classList.add('flex');
-        const firstInput = this.addBoardFormTarget.querySelector('input[type="text"]');
-        if (firstInput) {
-            firstInput.focus();
-        }
-    }
-
-    closeAddBoardModal() {
-        this.addBoardModalTarget.classList.add('hidden');
-        this.addBoardModalTarget.classList.remove('flex');
-        this.addBoardFormTarget.reset();
-    }
-
-    submitAddBoardForm(event) {
-        event.preventDefault();
-
-        const formData = new FormData(this.addBoardFormTarget);
-
-        fetch(this.addBoardFormTarget.action, {
-            method: 'POST',
-            body: formData
-        }).then(response => {
-            if (response.ok) {
-                this.closeAddBoardModal();
-                location.reload(); // Odśwież stronę główną, aby zobaczyć nową tablicę
-            } else {
-                console.error('Błąd podczas dodawania tablicy');
-                response.json().then(data => {
-                    alert(`Błąd: ${data.error}`);
-                }).catch(() => alert('Wystąpił błąd podczas dodawania tablicy.'));
-            }
-        }).catch(error => {
-            console.error('Błąd:', error);
-            alert('Wystąpił błąd sieci podczas dodawania tablicy.');
-        });
-    }
-
-    // Funkcja do usuwania tablicy
     async deleteBoard(event) {
+        event.preventDefault();
         const boardId = event.currentTarget.dataset.boardId;
         const boardName = event.currentTarget.dataset.boardName;
 
-        if (!confirm(`Czy na pewno chcesz usunąć tablicę "${boardName}" (ID: ${boardId})? To spowoduje usunięcie wszystkich list i zadań z nią związanych.`)) {
+        if (!confirm(`Czy na pewno chcesz usunąć tablicę "${boardName}"? Wszystkie zadania w liście "Ukończone" zostaną trwale usunięte.`)) {
             return;
         }
 
@@ -194,37 +305,75 @@ export default class extends Controller {
             const response = await fetch(`/board/${boardId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Content-Type': 'application/json',
-                },
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
 
             const data = await response.json();
-            if (response.ok) {
+
+            if (data.status === 'success') {
                 if (data.redirect) {
-                    window.location.href = data.redirect; // Przekieruj na stronę główną
+                    window.location.href = data.redirect;
                 } else {
-                    location.reload();
+                    window.location.reload();
                 }
             } else {
-                console.error('Błąd podczas usuwania tablicy:', data.error || 'Nieznany błąd');
-                alert(`Błąd podczas usuwania tablicy: ${data.error || 'Nieznany błąd'}`);
+                alert('Błąd podczas usuwania tablicy: ' + (data.error || 'Nieznany błąd.'));
             }
         } catch (error) {
-            console.error('Błąd:', error);
-            alert('Wystąpił błąd podczas usuwania tablicy.');
+            console.error('Error deleting board:', error);
+            alert('Wystąpił błąd sieci lub serwera podczas usuwania tablicy.');
         }
     }
 
-    // Zamykanie modala po kliknięciu tła
-    closeOnBackdrop(event) {
-        if (event.target === this.modalTarget) {
-            this.close();
+    async submitAddBoardForm(event) {
+        event.preventDefault();
+
+        if (!this.hasAddBoardFormTarget) {
+            console.error("Missing addBoardForm target."); // To już nie powinno się pokazać po zmianie HTML
+            return;
         }
-        if (event.target === this.editModalTarget) {
-            this.closeEditModal();
+        const form = this.addBoardFormTarget;
+        const formData = new FormData(form);
+        const boardName = formData.get('name'); // Pobierz wartość z pola input o nazwie 'name'
+
+        // Oczyść poprzednie błędy
+        if (this.hasAddBoardErrorsTarget) {
+            this.clearErrors(this.addBoardErrorsTarget);
         }
-        if (this.hasAddBoardModalTarget && event.target === this.addBoardModalTarget) {
+
+        try {
+            const response = await fetch(form.action, {
+                method: form.method,
+                // WAŻNA ZMIANA: Wysyłaj jako JSON, a nie FormData dla API
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Dodatkowe nagłówek dla Symfony
+                },
+                body: JSON.stringify({ name: boardName }), // Wysyłaj obiekt JSON z nazwą tablicy
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) { // Sprawdź, czy odpowiedź nie jest sukcesem (np. status 4xx, 5xx)
+                if (this.hasAddBoardErrorsTarget) {
+                    this.displayErrors(this.addBoardErrorsTarget, data.errors || [data.message || 'Wystąpił nieznany błąd.']);
+                } else {
+                    console.error("Błąd dodawania tablicy:", data);
+                }
+                return;
+            }
+
+            // Sukces
+            console.log('Tablica dodana pomyślnie:', data);
             this.closeAddBoardModal();
+            window.location.reload(); // Przeładuj stronę, aby nowa tablica była widoczna
+
+        } catch (error) {
+            console.error('Error submitting add board form:', error);
+            if (this.hasAddBoardErrorsTarget) {
+                this.displayErrors(this.addBoardErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
+            }
         }
     }
 }
