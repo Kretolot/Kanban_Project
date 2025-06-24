@@ -1,0 +1,155 @@
+/* --- GLOBALNE STYLE --- */
+body {
+    background-color: #0079bf; /* Kolor tła dla całej strony Kanban */
+    margin: 0;
+    font-family: sans-serif; /* Podstawowa czcionka */
+    line-height: 1.6; /* Lepszy odstęp między liniami tekstu */
+    color: #333; /* Domyślny kolor tekstu */
+}
+
+/* --- KANBAN BOARD (GŁÓWNY KONTENER KOLUMN) --- */
+.kanban-board {
+    display: flex; /* Używamy Flexboxa, by kolumny były obok siebie */
+    gap: 16px; /* Odstęp między kolumnami */
+    padding: 16px; /* Wewnętrzny odstęp całego boardu */
+    overflow-x: auto; /* Przewijanie poziome, jeśli kolumn jest za dużo */
+    height: calc(100vh - 80px); /* Wypełnij wysokość widoku minus przestrzeń na nagłówek/inne elementy */
+    align-items: flex-start; /* KLUCZOWE: Kolumny będą wyrównane do góry i nie będą się rozciągać do tej samej wysokości, chyba że mają zawartość */
+}
+
+/* Ukryj paski przewijania dla głównego kontenera Kanban (jeśli pojawią się poziome) */
+.kanban-board::-webkit-scrollbar {
+    height: 8px; /* Wysokość paska dla przewijania poziomego */
+}
+
+.kanban-board::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.kanban-board::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.kanban-board::-webkit-scrollbar-track {
+    background: transparent; /* Przezroczysty track dla paska poziomego */
+}
+
+
+/* --- POJEDYNCZA KOLUMNA KANBAN --- */
+.kanban-col {
+    background-color: #ebecf0;
+    border-radius: 8px; /* Zaokrąglone rogi */
+    padding: 16px; /* Zwiększono padding z 12px na 16px */
+    min-width: 280px; /* Minimalna szerokość kolumny - możesz tu zmienić szerokość */
+    flex-shrink: 0; /* Zapobiega kurczeniu się kolumn poniżej min-width */
+    box-shadow: 0 1px 3px rgba(0,30,66,.1); /* Delikatny cień */
+    
+    display: flex; /* Używamy Flexboxa wewnątrz kolumny */
+    flex-direction: column; /* Elementy w kolumnie ułożone pionowo (nagłówek, przycisk, lista zadań) */
+    
+    /* Usunięto stałą max-height, aby kolumna rosła z zawartością */
+    border: 2px solid transparent; /* Podstawowa ramka, która może się zmieniać przy drag & drop */
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+
+    /* Agresywne ukrywanie overflow dla kolumny */
+    overflow: hidden !important; /* Wymuś ukrycie overflow dla kolumny */
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+.kanban-col::-webkit-scrollbar {
+    display: none !important; /* Webkit */
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* --- NAGŁÓWEK KOLUMNY --- */
+.kanban-col-header {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #172b4d;
+    margin-bottom: 8px;
+    padding: 0 4px; /* Mały padding, aby tekst nie dotykał krawędzi */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kanban-col-header .task-count {
+    background-color: #dcdfe4;
+    color: #5e6c84;
+    font-size: 0.8em;
+    padding: 4px 8px;
+    border-radius: 12px;
+    min-width: 25px; /* Minimalna szerokość, aby wyglądało na "kółko" */
+    text-align: center;
+}
+
+/* --- KONTENER NA ZADANIA W KOLUMNIE (to w nim jest przewijanie) --- */
+.kanban-tasks-list {
+    flex-grow: 1; /* Pozwala na rozciąganie się i zajmowanie dostępnej przestrzeni pionowej */
+    overflow-y: auto; /* Umożliwia przewijanie, jeśli zadań jest za dużo */
+    padding-top: 8px; /* Mały odstęp od przycisku "Dodaj zadanie" */
+    min-height: 20px; /* Minimalna wysokość, aby obszar upuszczania był widoczny */
+
+    /* Agresywne ukrywanie pasków przewijania dla kontenera zadań */
+    overflow-y: hidden !important; /* Wymuś ukrycie paska pionowego */
+    overflow-x: hidden !important; /* Wymuś ukrycie paska poziomego */
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+/* Ukryj paski przewijania dla Webkit (Chrome, Safari, Edge) */
+.kanban-tasks-list::-webkit-scrollbar {
+    display: none !important; /* Ukryj wizualny pasek przewijania */
+    width: 0 !important;      /* Upewnij się, że nie zajmuje miejsca */
+    height: 0 !important;
+}
+
+/* --- KARTY ZADAŃ --- */
+.kanban-task {
+    background-color: #ffffff;
+    padding: 10px 13px; /* Zmieniony padding */
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,30,66,.1);
+    cursor: grab;
+    margin-bottom: 10px; /* Odstęp między zadaniami */
+    word-wrap: break-word; /* Zapewnia zawijanie długich słów */
+    transition: all 0.2s ease-in-out;
+
+    overflow-x: hidden !important; /* Wymuś ukrycie poziomego overflow w zadaniu */
+    box-sizing: border-box; /* DODANA LINIA! */
+}
+
+.kanban-task:last-child {
+    margin-bottom: 0; /* Brak dolnego marginesu dla ostatniego zadania w liście */
+}
+
+.kanban-task h4 {
+    font-size: 1em; /* Ujednolicone do em */
+    font-weight: 600;
+    color: #172b4d;
+    margin-bottom: 4px;
+}
+
+.kanban-task p {
+    font-size: 0.9em; /* Trochę mniejsza czcionka */
+    color: #5e6c84;
+    line-height: 1.4;
+}
+
+/* --- STYLES DRAG & DROP --- */
+.kanban-col.drag-over {
+    background-color: #e0e0e0;
+    border-color: #0079bf;
+    border-style: solid;
+    border-width: 2px;
+    box-shadow: 0 0 8px rgba(0, 121, 191, 0.4);
+}
+
+.kanban-task.dragging {
+    opacity: 0.8;
+    box-shadow: 0 8px 16px -4px rgba(9,30,66,.25), 0 0 0 1px rgba(9,30,66,.08);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}

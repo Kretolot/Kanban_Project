@@ -1,0 +1,39 @@
+{# templates/kanban/index.html.twig #}
+{% extends 'base.html.twig' %}
+
+{% block title %}Moje tablice{% endblock %}
+
+{% block body %}
+    <h2 class="text-2xl font-bold mb-6">Moje tablice Kanban</h2>
+
+    {% if boards is empty %}
+        <p class="text-gray-600">Nie masz jeszcze żadnych tablic. Stwórz swoją pierwszą tablicę, klikając "Nowa Tablica"!</p>
+    {% else %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for board in boards %}
+                <div class="bg-white rounded-lg shadow-md p-6 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">
+                            <a href="{{ path('kanban_board', {id: board.id}) }}" class="hover:text-blue-600 transition-colors">
+                                {{ board.name }}
+                            </a>
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">Utworzono: {{ board.createdAt|date('d.m.Y H:i') }}</p>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <a href="{{ path('kanban_board', {id: board.id}) }}"
+                           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Otwórz tablicę
+                        </a>
+                        <button data-action="click->modal#deleteBoard"
+                                data-board-id="{{ board.id }}"
+                                data-board-name="{{ board.name }}"
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                            Usuń
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endblock %}

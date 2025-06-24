@@ -1,0 +1,99 @@
+{# templates/welcome.html.twig #}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Witaj w aplikacji!</title>
+    
+    <style>
+        /* Proste style CSS, jeśli nie używasz Tailwind CSS */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5; /* Jasne tło */
+        }
+        .welcome-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        .welcome-container h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .welcome-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px; /* Odstęp między przyciskami */
+            margin-top: 30px;
+        }
+        .welcome-button {
+            display: inline-block;
+            padding: 12px 25px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .welcome-button:hover {
+            transform: translateY(-2px);
+        }
+        .button-primary {
+            background-color: #007bff; /* Kolor niebieski */
+            color: white;
+            border: 2px solid #007bff;
+        }
+        .button-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        .button-secondary {
+            background-color: #6c757d; /* Kolor szary */
+            color: white;
+            border: 2px solid #6c757d;
+        }
+        .button-secondary:hover {
+            background-color: #545b62;
+            border-color: #545b62;
+        }
+        .button-logged-in {
+            background-color: #28a745; /* Kolor zielony */
+            color: white;
+            border: 2px solid #28a745;
+        }
+        .button-logged-in:hover {
+            background-color: #218838;
+            border-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-container">
+        <h1>Witaj w naszej aplikacji!</h1>
+        <p>Tutaj możesz zarządzać swoimi zadaniami i projektami.</p>
+
+        <div class="welcome-buttons">
+            {# Sprawdzenie, czy użytkownik jest zalogowany #}
+            {% if app.user %}
+                {# Dla zalogowanych: przycisk "Strona główna" #}
+                <a href="{{ path('app_home') }}" class="welcome-button button-logged-in">Strona główna</a>
+            {% else %}
+                {# Dla niezalogowanych: przyciski "Zaloguj" i "Zarejestruj" #}
+                <a href="{{ path('app_login') }}" class="welcome-button button-primary">Zaloguj</a>
+                <a href="{{ path('app_register') }}" class="welcome-button button-secondary">Zarejestruj</a>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

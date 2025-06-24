@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{% block title %}Kanban Board{% endblock %}</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text></svg>">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        {% block stylesheets %}
+            <script src="https://cdn.tailwindcss.com"></script>
+        {% endblock %}
+
+        {% block importmap %}
+            {{ importmap('app') }}
+        {% endblock %}
+    </head>
+    <body class="bg-gray-50" data-controller="modal">
+        <nav class="bg-blue-600 text-white p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-xl font-bold">
+                    <a href="{{ path('app_home') }}">Kanban Board</a>
+                </h1>
+                <div class="flex items-center space-x-4">
+                    {% if app.user %}
+                        <span class="text-white text-sm">Witaj, {{ app.user.userIdentifier }}!</span>
+                        <a href="{{ path('app_logout') }}"
+                           class="bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-800 transition-colors text-sm">
+                            Wyloguj
+                        </a>
+                        {# Przycisk "Nowa Tablica" tylko dla zalogowanych #}
+                        <button data-action="click->modal#openAddBoardModal"
+                                class="bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-800 transition-colors text-sm">
+                            + Nowa Tablica
+                        </button>
+                    {% else %}
+                        <a href="{{ path('app_login') }}"
+                           class="bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-800 transition-colors text-sm">
+                            Zaloguj
+                        </a>
+                        <a href="{{ path('app_register') }}"
+                           class="bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-800 transition-colors text-sm">
+                            Zarejestruj
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <main class="container mx-auto py-6">
+            {% for message in app.flashes('success') %}
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                    <span class="block sm:inline">{{ message }}</span>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                    <span class="block sm:inline">{{ message }}</span>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('verify_email_error') %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                    <span class="block sm:inline">{{ message }}</span>
+                </div>
+            {% endfor %}
+
+            {% block body %}{% endblock %}
+        </main>
+
+        {# Modal do dodawania nowych tablic (wyświetlany tylko jeśli użytkownik jest zalogowany) #}
+        {% if app.user %}
+            <div data-modal-target="modal" class="fixed inset-0 bg-black bg-opacity-50
+            hidden items-center justify-center z-50">
+                <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+                    <h3 class="text-lg font-bold mb-4">Dodaj nową tablicę</h3>
+
+                    <form data-modal-target="addBoardForm"
+                        data-action="submit->modal#submitAddBoardForm"
+                        action="{{ path('kanban_add_board') }}"
+                        method="post">
+                        <div class="mb-4">
+                            <label for="board_name" class="block text-sm font-medium text-gray-700 mb-2">
+                                Nazwa tablicy
+                            </label>
+                            <input type="text"
+                                id="board_name"
+                                name="name" {# To pole jest używane do pobrania wartości 'name' #}
+                                required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Wprowadź nazwę tablicy">
+                        </div>
+                        <div data-modal-target="addBoardErrors" class="text-red-600 text-sm mb-4"></div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button"
+                                    data-action="click->modal#closeAddBoardModal"
+                                    class="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+                                Anuluj
+                            </button>
+                            <button type="submit"
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                                Dodaj tablicę
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </body>
+</html>

@@ -1,0 +1,171 @@
+{# templates/kanban/board.html.twig #}
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ board.name }} - Kanban{% endblock %}
+
+{% block body %}
+<div class="mb-6 flex justify-between items-center">
+    <h2 class="text-2xl font-bold">{{ board.name }}</h2>
+</div>
+
+{# Kontroler Stimulus dla drag-and-drop #}
+{# Zmieniono klasy Tailwind na Twoje klasy CSS, aby zapewnić elastyczność wysokości #}
+<div data-controller="drag-drop" class="kanban-board"> {# Zmieniono na kanban-board #}
+    {% for col in board.cols %}
+        {# Zmieniono klasy Tailwind na Twoje klasy CSS i dodano 'flex flex-col' #}
+        <div class="kanban-col flex flex-col" {# Dodano flex flex-col do kolumny #}
+             data-drag-drop-target="column"
+             data-col-id="{{ col.id }}">
+
+            <div class="kanban-col-header flex justify-between items-center mb-4"> {# Użyłem Twojej klasy kanban-col-header #}
+                <h3 class="font-bold text-lg">{{ col.name }}</h3>
+                <span class="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-sm task-count">
+                    {{ col.tasks|length }}
+                </span>
+            </div>
+
+            {# Przycisk "Dodaj zadanie" #}
+            <button data-action="click->modal#open"
+                    data-col-id="{{ col.id }}"
+                    class="w-full mb-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
+                + Dodaj zadanie
+            </button>
+
+            {# Ten kontener będzie dynamicznie rosnać/kurczyć się #}
+            <div class="space-y-3 min-h-32 flex-grow overflow-y-auto" data-drag-drop-target="tasksContainer"> {# Dodano flex-grow i overflow-y-auto #}
+                {% for task in col.tasks %}
+                    <div class="bg-white p-4 rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-400 kanban-task"
+                         data-drag-drop-target="card"
+                         data-task-id="{{ task.id }}"
+                         data-col-id="{{ col.id }}"
+                         data-action="click->modal#openEditModal">
+                        <h4 class="font-semibold text-gray-800 mb-2">{{ task.title }}</h4>
+                        {% if task.description %}
+                            <p class="text-sm text-gray-600 line-clamp-3">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="mt-2 text-xs text-gray-400">
+                            {{ task.createdAt|date('d.m.Y H:i') }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+{# Modale pozostają bez zmian, bo nie wpływają na wysokość list #}
+{# Modal do dodawania zadań #}
+<div data-modal-target="modal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold mb-4">Dodaj nowe zadanie</h3>
+
+        <form data-modal-target="form"
+              data-action="submit->modal#submitForm"
+              action="{{ path('kanban_add_task', {id: board.id}) }}"
+              method="post">
+
+            <input type="hidden" name="col_id" data-modal-target="colIdInput">
+
+            <div class="mb-4">
+                <label for="title" class="block text-sm font-medium text-gray-700 mb-2">
+                    Tytuł zadania
+                </label>
+                <input type="text"
+                       id="title"
+                       name="title"
+                       required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Wprowadź tytuł zadania">
+            </div>
+            {# Kontener na błędy walidacji #}
+            <div data-modal-target="taskErrors" class="text-red-600 text-sm mb-4"></div>
+
+            <div class="mb-6">
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                    Opis (opcjonalny)
+                </label>
+                <textarea id="description"
+                              name="description"
+                              rows="3"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Wprowadź opis zadania"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button"
+                        data-action="click->modal#close"
+                        class="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+                    Anuluj
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                    Dodaj zadanie
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# Modal do edycji/usuwania zadań #}
+<div data-modal-target="editModal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold mb-4">Edytuj zadanie</h3>
+
+        <form data-modal-target="editForm"
+              data-action="submit->modal#submitEditForm"
+              method="post">
+
+            <input type="hidden" name="_method" value="PUT">
+            <input type="hidden" name="task_id" data-modal-target="editTaskId">
+
+            <div class="mb-4">
+                <label for="edit_title" class="block text-sm font-medium text-gray-700 mb-2">
+                    Tytuł zadania
+                </label>
+                <input type="text"
+                       id="edit_title"
+                       name="title"
+                       required
+                       data-modal-target="editTitle"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            {# Kontener na błędy walidacji #}
+            <div data-modal-target="editTaskErrors" class="text-red-600 text-sm mb-4"></div>
+
+            <div class="mb-6">
+                <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-2">
+                    Opis (opcjonalny)
+                </label>
+                <textarea id="edit_description"
+                              name="description"
+                              rows="3"
+                              data-modal-target="editDescription"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <div>
+                    <button type="button"
+                            data-action="click->modal#deleteTask"
+                            class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                        Usuń zadanie
+                    </button>
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button"
+                            data-action="click->modal#closeEditModal"
+                            class="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+                        Anuluj
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                        Zapisz zmiany
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
