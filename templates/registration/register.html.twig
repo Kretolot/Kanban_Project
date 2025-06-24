@@ -4,29 +4,66 @@
 {% block title %}Rejestracja{% endblock %}
 
 {% block body %}
-<div class="flex justify-center items-center h-[calc(100vh-64px)]"> {# Wysrodkowanie na stronie #}
+<div class="flex justify-center items-center h-[calc(100vh-64px)]">
     <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <h1 class="text-2xl font-bold text-center mb-6">Zarejestruj się</h1>
 
-        {{ form_errors(registrationForm) }}
+        {# Wyświetlanie flash messages (dla sukcesu i błędów, np. z kontrolera) #}
+        {% for message in app.flashes('success') %}
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">{{ message }}</span>
+            </div>
+        {% endfor %}
+        {% for message in app.flashes('error') %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">{{ message }}</span>
+            </div>
+        {% endfor %}
 
-        {{ form_start(registrationForm) }}
+        {# Wyświetlanie ogólnych błędów formularza (np. jeśli nie są przypisane do konkretnego pola) #}
+        {# DODAJEMY STYLI DLA OGOŁNYCH BŁĘDÓW FORMULARZA #}
+        {% if registrationForm.vars.errors|length > 0 %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm" role="alert">
+                {{ form_errors(registrationForm) }}
+            </div>
+        {% endif %}
+
+        {# Zmieniamy data-turbo-action na data-turbo="false" zgodnie z Twoimi testami #}
+        {{ form_start(registrationForm, {'attr': {'data-turbo': 'false'}}) }}
             <div class="mb-4">
                 {{ form_label(registrationForm.email, 'Email', {'label_attr': {'class': 'block text-sm font-medium text-gray-700 mb-2'}}) }}
                 {{ form_widget(registrationForm.email, {'attr': {'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Twój adres email'}}) }}
-                {{ form_errors(registrationForm.email) }}
+                {# Wyświetlanie błędów dla pola email #}
+                {# DODAJEMY STYLI DLA BŁĘDÓW POLA EMAIL #}
+                {% if registrationForm.email.vars.errors|length > 0 %}
+                    <div class="text-red-600 text-sm mt-1">
+                        {{ form_errors(registrationForm.email) }}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="mb-4">
                 {{ form_label(registrationForm.plainPassword, 'Hasło', {'label_attr': {'class': 'block text-sm font-medium text-gray-700 mb-2'}}) }}
                 {{ form_widget(registrationForm.plainPassword, {'attr': {'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Wprowadź hasło'}}) }}
-                {{ form_errors(registrationForm.plainPassword) }}
+                {# Wyświetlanie błędów dla pola plainPassword #}
+                {# DODAJEMY STYLI DLA BŁĘDÓW POLA HASŁA #}
+                {% if registrationForm.plainPassword.vars.errors|length > 0 %}
+                    <div class="text-red-600 text-sm mt-1">
+                        {{ form_errors(registrationForm.plainPassword) }}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="mb-6 flex items-center">
                 {{ form_widget(registrationForm.agreeTerms, {'attr': {'class': 'h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'}}) }}
                 {{ form_label(registrationForm.agreeTerms, 'Akceptuję warunki', {'label_attr': {'class': 'ml-2 block text-sm text-gray-900'}}) }}
-                {{ form_errors(registrationForm.agreeTerms) }}
+                {# Wyświetlanie błędów dla pola agreeTerms #}
+                {# DODAJEMY STYLI DLA BŁĘDÓW POLA ZGODNOŚCI Z WARUNKAMI #}
+                {% if registrationForm.agreeTerms.vars.errors|length > 0 %}
+                    <div class="text-red-600 text-sm mt-1">
+                        {{ form_errors(registrationForm.agreeTerms) }}
+                    </div>
+                {% endif %}
             </div>
 
             <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
