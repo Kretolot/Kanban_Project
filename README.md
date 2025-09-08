@@ -1,6 +1,6 @@
 # Kanban_System
 git clone (link do repo)<br>
-cd (nazwa folderu)
+cd (nazwa folderu)<br>
 composer install<br>
 php bin/console cache:clear --env=dev<br>
 php bin/console doctrine:database:create<br>
