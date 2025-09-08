@@ -14,7 +14,7 @@
             </div>
         {% endif %}
 
-        <form method="post" action="{{ path('app_login') }}">
+        <form method="post" action="{{ path('app_login') }}" data-turbo="false">
             <div class="mb-4">
                 <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
                 <input type="email"
@@ -36,6 +36,7 @@
                        required>
             </div>
 
+            {# Poprawnie generowany token CSRF #}
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
 
             <button type="submit"
