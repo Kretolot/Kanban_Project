@@ -1,5 +1,8 @@
 # Kanban_System
-composer install
-php bin/console cache:clear --env=dev
-php bin/console doctrine:database:create
-php bin/console doctrine:migrations:migrate
+git clone (link do repo)<br>
+composer install<br>
+php bin/console cache:clear --env=dev<br>
+php bin/console doctrine:database:create<br>
+php bin/console doctrine:migrations:migrate<br>
+synfony server:start<br>
+127.0.0.1:8000
