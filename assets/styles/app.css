@@ -54,6 +54,9 @@ body {
     scroll-behavior: smooth;
     /* Enable GPU acceleration */
     will-change: scroll-position;
+    /* 20px margins from walls */
+    margin: 0 20px;
+    width: calc(100% - 40px);
 }
 
 /* Optimized scrollbar styling */
@@ -415,6 +418,9 @@ body {
         padding: 8px;
         gap: 8px;
         height: calc(100vh - 140px);
+        /* 10px margins on mobile */
+        margin: 0 10px;
+        width: calc(100% - 20px);
     }
     
     .kanban-col {
@@ -480,6 +486,8 @@ body {
         display: block;
         height: auto;
         overflow: visible;
+        margin: 0 20px;
+        width: calc(100% - 40px);
     }
     
     .kanban-col {
@@ -498,7 +506,8 @@ body {
         break-inside: avoid;
     }
 }
-/* === DODAJ NA KOŃCU PLIKU assets/styles/app.css === */
+
+/* ===== CUSTOM KANBAN STYLES ===== */
 
 /* Kanban Board Layout */
 .kanban-board {
@@ -506,10 +515,13 @@ body {
     gap: 16px;
     padding: 16px;
     overflow-x: auto;
-    min-height: calc(100vh - 200px); /* POPRAWKA WYSOKOŚCI */
+    min-height: calc(100vh - 200px);
     align-items: flex-start;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+    /* 20px margins from walls */
+    margin: 0 20px;
+    width: calc(100% - 40px);
 }
 
 /* Column styles */
@@ -631,6 +643,9 @@ body {
         padding: 8px;
         gap: 8px;
         min-height: calc(100vh - 160px);
+        /* 10px margines od boków na mobile */
+        margin: 0 10px;
+        width: calc(100% - 20px);
     }
     
     .kanban-col {
@@ -657,4 +672,21 @@ body {
 
 .kanban-board::-webkit-scrollbar-thumb:hover {
     background: rgba(0,0,0,0.5);
+}
+
+/* ===== CUSTOM ADDITIONS FOR LAYOUT ===== */
+
+/* Board title centered with 90% width */
+.kanban-board-title {
+    text-align: center;
+    width: 90%;
+    margin: 0 auto 1.5rem auto;
+}
+
+/* Responsive title */
+@media (max-width: 768px) {
+    .kanban-board-title {
+        width: 90%;
+        margin: 0 auto 1.5rem auto;
+    }
 }
