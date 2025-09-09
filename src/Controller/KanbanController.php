@@ -152,7 +152,11 @@ class KanbanController extends AbstractController
         }
     }
 
+<<<<<<< HEAD
     // ==================== COLUMN MANAGEMENT ====================
+=======
+    // ==================== NOWE METODY DLA ZARZĄDZANIA KOLUMNAMI ====================
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
 
     #[Route('/board/{id}/column/add', name: 'kanban_add_column', methods: ['POST'])]
     public function addColumn(Board $board, Request $request, ValidatorInterface $validator): Response
@@ -160,13 +164,21 @@ class KanbanController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
         if ($board->getOwner() !== $user) {
+<<<<<<< HEAD
             return $this->handleAuthorizationError($request);
+=======
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nie masz uprawnień do dodania kolumny do tej tablicy.']], JsonResponse::HTTP_FORBIDDEN);
+            }
+            throw $this->createAccessDeniedException('Nie masz uprawnień do dodania kolumny do tej tablicy.');
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
         }
 
         $data = json_decode($request->getContent(), true);
         $colName = $data['name'] ?? null;
 
         if (null === $colName || empty(trim($colName))) {
+<<<<<<< HEAD
             return $this->handleValidationError(
                 'Nazwa kolumny nie może być pusta.',
                 $request
@@ -210,6 +222,59 @@ class KanbanController extends AbstractController
         } catch (\Exception $e) {
             return $this->handleError('Wystąpił błąd podczas dodawania kolumny.', $request);
         }
+=======
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nazwa kolumny nie może być pusta.']], JsonResponse::HTTP_BAD_REQUEST);
+            }
+            $this->addFlash('error', 'Nazwa kolumny nie może być pusta.');
+            return $this->redirectToRoute('kanban_board', ['id' => $board->getId()]);
+        }
+
+        // Znajdź najwyższą pozycję i dodaj nową kolumnę na końcu
+        $maxPosition = $this->colRepository->createQueryBuilder('c')
+            ->select('MAX(c.position)')
+            ->where('c.board = :board')
+            ->setParameter('board', $board)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $col = new Col();
+        $col->setName($colName);
+        $col->setPosition(($maxPosition ?? -1) + 1);
+        $col->setBoard($board);
+
+        $errors = $validator->validate($col);
+
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[] = $error->getMessage();
+            }
+
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+            } else {
+                foreach ($errors as $error) {
+                    $this->addFlash('error', $error->getMessage());
+                }
+                return $this->redirectToRoute('kanban_board', ['id' => $board->getId()]);
+            }
+        }
+
+        $this->entityManager->persist($col);
+        $this->entityManager->flush();
+
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Kolumna "' . $colName . '" została dodana!',
+                'redirect' => $this->generateUrl('kanban_board', ['id' => $board->getId()])
+            ], JsonResponse::HTTP_CREATED);
+        }
+
+        $this->addFlash('success', 'Kolumna "' . $colName . '" została dodana!');
+        return $this->redirectToRoute('kanban_board', ['id' => $board->getId()]);
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
     }
 
     #[Route('/column/{id}/move', name: 'kanban_move_column', methods: ['PATCH'])]
@@ -224,6 +289,7 @@ class KanbanController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $newPosition = $data['position'] ?? null;
 
+<<<<<<< HEAD
         if ($newPosition === null || !is_numeric($newPosition)) {
             return new JsonResponse(['error' => 'Nie podano prawidłowej pozycji.'], JsonResponse::HTTP_BAD_REQUEST);
         }
@@ -266,6 +332,41 @@ class KanbanController extends AbstractController
             $this->entityManager->rollback();
             return new JsonResponse(['error' => 'Wystąpił błąd podczas przenoszenia kolumny.'], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
+=======
+        if ($newPosition === null) {
+            return new JsonResponse(['error' => 'Nie podano nowej pozycji.'], JsonResponse::HTTP_BAD_REQUEST);
+        }
+
+        $oldPosition = $col->getPosition();
+        $board = $col->getBoard();
+
+        // Pobierz wszystkie kolumny tej tablicy
+        $columns = $this->colRepository->findBy(['board' => $board], ['position' => 'ASC']);
+
+        // Przeorganizuj pozycje
+        if ($newPosition > $oldPosition) {
+            // Przesuwanie w prawo
+            foreach ($columns as $column) {
+                $pos = $column->getPosition();
+                if ($pos > $oldPosition && $pos <= $newPosition) {
+                    $column->setPosition($pos - 1);
+                }
+            }
+        } else {
+            // Przesuwanie w lewo
+            foreach ($columns as $column) {
+                $pos = $column->getPosition();
+                if ($pos >= $newPosition && $pos < $oldPosition) {
+                    $column->setPosition($pos + 1);
+                }
+            }
+        }
+
+        $col->setPosition($newPosition);
+        $this->entityManager->flush();
+
+        return new JsonResponse(['status' => 'success'], JsonResponse::HTTP_OK);
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
     }
 
     #[Route('/column/{id}', name: 'kanban_delete_column', methods: ['DELETE'])]
@@ -277,19 +378,30 @@ class KanbanController extends AbstractController
             return new JsonResponse(['error' => 'Nie masz uprawnień do usunięcia tej kolumny.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
+<<<<<<< HEAD
         $board = $col->getBoard();
         $boardId = $board->getId();
 
         // Check if it's not the last column
+=======
+        $boardId = $col->getBoard()->getId();
+        $board = $col->getBoard();
+
+        // Sprawdź czy to nie ostatnia kolumna
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
         $columnsCount = $this->colRepository->count(['board' => $board]);
         if ($columnsCount <= 1) {
             return new JsonResponse(['error' => 'Nie można usunąć ostatniej kolumny z tablicy.'], JsonResponse::HTTP_BAD_REQUEST);
         }
 
         try {
+<<<<<<< HEAD
             $this->entityManager->beginTransaction();
 
             // Check if column has tasks
+=======
+            // Sprawdź czy kolumna ma zadania
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
             if ($col->getTasks()->count() > 0) {
                 return new JsonResponse(['error' => 'Nie można usunąć kolumny zawierającej zadania. Przenieś najpierw zadania do innej kolumny.'], JsonResponse::HTTP_BAD_REQUEST);
             }
@@ -297,7 +409,11 @@ class KanbanController extends AbstractController
             $oldPosition = $col->getPosition();
             $this->entityManager->remove($col);
 
+<<<<<<< HEAD
             // Update positions of remaining columns
+=======
+            // Zaktualizuj pozycje pozostałych kolumn
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
             $remainingColumns = $this->colRepository->createQueryBuilder('c')
                 ->where('c.board = :board')
                 ->andWhere('c.position > :position')
@@ -310,6 +426,7 @@ class KanbanController extends AbstractController
                 $column->setPosition($column->getPosition() - 1);
             }
 
+<<<<<<< HEAD
             $this->entityManager->commit();
 
             $this->addFlash('success', 'Kolumna "' . $col->getName() . '" została pomyślnie usunięta.');
@@ -317,6 +434,14 @@ class KanbanController extends AbstractController
 
         } catch (\Exception $e) {
             $this->entityManager->rollback();
+=======
+            $this->entityManager->flush();
+
+            $this->addFlash('success', 'Kolumna "' . $col->getName() . '" została pomyślnie usunięta.');
+            return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])], JsonResponse::HTTP_OK);
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Wystąpił błąd podczas usuwania kolumny: ' . $e->getMessage());
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
             return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania kolumny: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -327,6 +452,7 @@ class KanbanController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
         if ($col->getBoard()->getOwner() !== $user) {
+<<<<<<< HEAD
             return $this->handleAuthorizationError($request);
         }
 
@@ -341,12 +467,47 @@ class KanbanController extends AbstractController
         }
 
         try {
+=======
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'errors' => ['Nie masz uprawnień do edycji tej kolumny.']], JsonResponse::HTTP_FORBIDDEN);
+            }
+            throw $this->createAccessDeniedException('Nie masz uprawnień do edycji tej kolumny.');
+        }
+
+        if ($request->request->get('_method') === 'PUT') {
+            $name = $request->request->get('name');
+
+            if (empty(trim($name))) {
+                if ($request->isXmlHttpRequest()) {
+                    return new JsonResponse(['success' => false, 'errors' => ['Nazwa kolumny nie może być pusta.']], JsonResponse::HTTP_BAD_REQUEST);
+                }
+                $this->addFlash('error', 'Nazwa kolumny nie może być pusta.');
+                return $this->redirectToRoute('kanban_board', ['id' => $col->getBoard()->getId()]);
+            }
+
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
             $col->setName($name);
 
             $errors = $validator->validate($col);
 
             if (count($errors) > 0) {
+<<<<<<< HEAD
                 return $this->handleValidationErrors($errors, $request);
+=======
+                $errorMessages = [];
+                foreach ($errors as $error) {
+                    $errorMessages[] = $error->getMessage();
+                }
+
+                if ($request->isXmlHttpRequest()) {
+                    return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+                } else {
+                    foreach ($errors as $error) {
+                        $this->addFlash('error', $error->getMessage());
+                    }
+                    return $this->redirectToRoute('kanban_board', ['id' => $col->getBoard()->getId()]);
+                }
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
             }
 
             $this->entityManager->flush();
@@ -358,6 +519,7 @@ class KanbanController extends AbstractController
                     'redirect' => $this->generateUrl('kanban_board', ['id' => $col->getBoard()->getId()])
                 ], JsonResponse::HTTP_OK);
             }
+<<<<<<< HEAD
 
             return $this->redirectToRoute('kanban_board', ['id' => $col->getBoard()->getId()]);
 
@@ -367,6 +529,18 @@ class KanbanController extends AbstractController
     }
 
     // ==================== TASK MANAGEMENT ====================
+=======
+            return $this->redirectToRoute('kanban_board', ['id' => $col->getBoard()->getId()]);
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse(['success' => false, 'errors' => ['Nieprawidłowa metoda żądania.']], JsonResponse::HTTP_METHOD_NOT_ALLOWED);
+        }
+        throw $this->createNotFoundException('Invalid request method');
+    }
+
+    // ==================== METODY DLA ZADAŃ (bez zmian) ====================
+>>>>>>> 81ee01cdda288f732d8f58084e2ec3018e33cda1
 
     #[Route('/task/{id}/move', methods: ['PATCH'])]
     public function moveTask(Task $task, Request $request): JsonResponse
