@@ -40,37 +40,4 @@ class BoardRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
-    /**
-     * Find user boards with task counts - optimized single query
-     */
-    public function findUserBoardsWithCounts(User $user): array
-    {
-        return $this->createQueryBuilder('b')
-            ->select('b', 'c', 'COUNT(t.id) as taskCount')
-            ->leftJoin('b.cols', 'c')
-            ->leftJoin('c.tasks', 't')
-            ->where('b.owner = :user')
-            ->setParameter('user', $user)
-            ->groupBy('b.id', 'c.id')
-            ->orderBy('b.createdAt', 'DESC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
-     * Find board with all columns and tasks in a single optimized query
-     */
-    public function findBoardWithColumnsAndTasks(int $boardId): ?Board
-    {
-        return $this->createQueryBuilder('b')
-            ->select('b', 'c', 't')
-            ->leftJoin('b.cols', 'c')
-            ->leftJoin('c.tasks', 't')
-            ->where('b.id = :boardId')
-            ->setParameter('boardId', $boardId)
-            ->orderBy('c.position', 'ASC')
-            ->addOrderBy('t.position', 'ASC')
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
 }

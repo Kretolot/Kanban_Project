@@ -16,5 +16,15 @@ services:
     App\:
         resource: '../src/'
 
+    # Kanban Services
+    App\Service\CacheService:
+        arguments:
+            $cache: '@cache.app'
+    
+    App\Service\KanbanService: ~
+    App\Service\PerformanceMonitoringService: ~
+    
+    # Event Listeners
+    App\EventListener\CacheInvalidationListener: ~
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
