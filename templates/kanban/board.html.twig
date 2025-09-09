@@ -4,19 +4,21 @@
 {% block title %}{{ board.name }} - Kanban{% endblock %}
 
 {% block body %}
-<div class="kanban-board-title">
-    <h2 class="text-2xl font-bold">{{ board.name }}</h2>
-</div>
+{# Usuń div z kontenerem i umieść zawartość bezpośrednio #}
+<div class="kanban-board-container">
+    <div class="kanban-board-title">
+        <h2 class="text-2xl font-bold">{{ board.name }}</h2>
+    </div>
 
-{# Kontroler drag-drop z board-id #}
-<div data-controller="drag-drop" 
-     data-board-id="{{ board.id }}"
-     class="kanban-board">
-    
-    {% for col in board.cols %}
-        <div class="kanban-col flex flex-col relative group"
-             data-drag-drop-target="column"
-             data-col-id="{{ col.id }}">
+    {# Kontroler drag-drop z board-id #}
+    <div data-controller="drag-drop" 
+         data-board-id="{{ board.id }}"
+         class="kanban-board">
+        
+        {% for col in board.cols %}
+            <div class="kanban-col flex flex-col relative group"
+                 data-drag-drop-target="column"
+                 data-col-id="{{ col.id }}">
 
             {# Column Header z drag handle i menu #}
             <div class="kanban-col-header flex justify-between items-center mb-4 relative"

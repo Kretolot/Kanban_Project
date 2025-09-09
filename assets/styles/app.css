@@ -690,3 +690,24 @@ body {
         margin: 0 auto 1.5rem auto;
     }
 }
+.kanban-board {
+    display: flex;
+    gap: 16px;
+    padding: 16px 20px; /* 20px po bokach w padding */
+    overflow-x: auto;
+    min-height: calc(100vh - 200px);
+    align-items: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    /* Usuń marginesy, użyj padding */
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .kanban-board {
+        padding: 8px 10px;
+    }
+}
