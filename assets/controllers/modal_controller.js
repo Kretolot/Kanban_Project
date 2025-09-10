@@ -16,29 +16,29 @@ export default class extends Controller {
         "editDescription", // Pole opisu zadania
         "editTaskErrors", // Kontener na błędy edycji zadania
 
-        // Modal dodawania tablicy - Upewnij się, że 'modal' odnosi się do GŁÓWNEGO kontenera modala
-        // W twoim HTML modal dodawania tablicy ma data-modal-target="modal", więc nie potrzebujesz osobnego targetu dla niego.
-        // ALE: formularz w środku MUSI mieć unikalny target.
-        // Tutaj 'addBoardForm' jest poprawne, ponieważ zmieniliśmy to w HTML.
+        // Modal dodawania tablicy
         "addBoardForm", // Formularz dodawania tablicy
-        "addBoardErrors" // Kontener na błędy dodawania tablicy
+        "addBoardErrors", // Kontener na błędy dodawania tablicy
+
+        // Modal dodawania kolumny
+        "addColumnModal", // Główny kontener modala dodawania kolumny
+        "addColumnForm", // Formularz dodawania kolumny
+        "addColumnErrors" // Kontener na błędy dodawania kolumny
     ];
 
     connect() {
         console.log('Modal controller connected');
         // Ukryj modale na start, ale TYLKO jeśli dany modal istnieje w DOM
-        if (this.hasModalTarget) { // Dotyczy modala dodawania zadania LUB dodawania tablicy (jeśli ma data-modal-target="modal")
+        if (this.hasModalTarget) { // Dotyczy modala dodawania zadania LUB dodawania tablicy
             this.modalTarget.classList.add('hidden');
             this.modalTarget.classList.remove('flex');
-            // Resetowanie formularza dodawania zadania i jego błędów
             if (this.hasFormTarget) {
                 this.formTarget.reset();
             }
             if (this.hasTaskErrorsTarget) {
                 this.clearErrors(this.taskErrorsTarget);
             }
-            // Resetowanie formularza dodawania tablicy i jego błędów (bo używa tego samego głównego kontenera modala)
-            if (this.hasAddBoardFormTarget) { // Teraz to będzie działać poprawnie
+            if (this.hasAddBoardFormTarget) {
                 this.addBoardFormTarget.reset();
             }
             if (this.hasAddBoardErrorsTarget) {
@@ -55,9 +55,19 @@ export default class extends Controller {
                 this.clearErrors(this.editTaskErrorsTarget);
             }
         }
+        if (this.hasAddColumnModalTarget) { // Dotyczy modala dodawania kolumny
+            this.addColumnModalTarget.classList.add('hidden');
+            this.addColumnModalTarget.classList.remove('flex');
+            if (this.hasAddColumnFormTarget) {
+                this.addColumnFormTarget.reset();
+            }
+            if (this.hasAddColumnErrorsTarget) {
+                this.clearErrors(this.addColumnErrorsTarget);
+            }
+        }
     }
 
-    // Metody do modala dodawania zadania (bez zmian, działają poprawnie z 'form' targetem)
+    // ========== METODY DO MODALA DODAWANIA ZADANIA ==========
     open(event) {
         if (this.hasColIdInputTarget && event.currentTarget.dataset.colId) {
             this.colIdInputTarget.value = event.currentTarget.dataset.colId;
@@ -65,14 +75,14 @@ export default class extends Controller {
         if (this.hasTaskErrorsTarget) {
             this.clearErrors(this.taskErrorsTarget);
         }
-        if (this.hasModalTarget) { // Odnosi się do głównego modala dla zadań
+        if (this.hasModalTarget) {
             this.modalTarget.classList.remove('hidden');
             this.modalTarget.classList.add('flex');
         }
     }
 
     close() {
-        if (this.hasModalTarget) { // Odnosi się do głównego modala dla zadań
+        if (this.hasModalTarget) {
             this.modalTarget.classList.add('hidden');
             this.modalTarget.classList.remove('flex');
         }
@@ -84,7 +94,7 @@ export default class extends Controller {
         }
     }
 
-    // Metody do modala edycji zadania (bez zmian)
+    // ========== METODY DO MODALA EDYCJI ZADANIA ==========
     openEditModal(event) {
         if (!this.hasEditModalTarget) {
             console.error("Edit modal target not found.");
@@ -123,27 +133,27 @@ export default class extends Controller {
         }
     }
 
-    // Metody do modala dodawania tablicy
+    // ========== METODY DO MODALA DODAWANIA TABLICY ==========
     openAddBoardModal() {
         console.log('Metoda openAddBoardModal została wywołana!');
-        if (this.hasModalTarget) { // Używamy this.modalTarget, ponieważ główny div modala tablicy ma data-modal-target="modal"
+        if (this.hasModalTarget) {
             this.modalTarget.classList.remove('hidden');
             this.modalTarget.classList.add('flex');
         }
         if (this.hasAddBoardErrorsTarget) {
             this.clearErrors(this.addBoardErrorsTarget);
         }
-        if (this.hasAddBoardFormTarget) { // To jest teraz poprawne odwołanie
+        if (this.hasAddBoardFormTarget) {
             this.addBoardFormTarget.reset();
         }
     }
 
     closeAddBoardModal() {
-        if (this.hasModalTarget) { // Używamy this.modalTarget, ponieważ główny div modala tablicy ma data-modal-target="modal"
+        if (this.hasModalTarget) {
             this.modalTarget.classList.add('hidden');
             this.modalTarget.classList.remove('flex');
         }
-        if (this.hasAddBoardFormTarget) { // To jest teraz poprawne odwołanie
+        if (this.hasAddBoardFormTarget) {
             this.addBoardFormTarget.reset();
         }
         if (this.hasAddBoardErrorsTarget) {
@@ -151,7 +161,35 @@ export default class extends Controller {
         }
     }
 
-    // Metoda do wyświetlania błędów w kontenerze
+    // ========== METODY DO MODALA DODAWANIA KOLUMNY ==========
+    openAddColumnModal() {
+        console.log('Metoda openAddColumnModal została wywołana!');
+        if (this.hasAddColumnModalTarget) {
+            this.addColumnModalTarget.classList.remove('hidden');
+            this.addColumnModalTarget.classList.add('flex');
+        }
+        if (this.hasAddColumnErrorsTarget) {
+            this.clearErrors(this.addColumnErrorsTarget);
+        }
+        if (this.hasAddColumnFormTarget) {
+            this.addColumnFormTarget.reset();
+        }
+    }
+
+    closeAddColumnModal() {
+        if (this.hasAddColumnModalTarget) {
+            this.addColumnModalTarget.classList.add('hidden');
+            this.addColumnModalTarget.classList.remove('flex');
+        }
+        if (this.hasAddColumnFormTarget) {
+            this.addColumnFormTarget.reset();
+        }
+        if (this.hasAddColumnErrorsTarget) {
+            this.clearErrors(this.addColumnErrorsTarget);
+        }
+    }
+
+    // ========== METODY POMOCNICZE ==========
     displayErrors(errorContainer, errors) {
         errorContainer.innerHTML = '';
         if (errors && errors.length > 0) {
@@ -166,12 +204,11 @@ export default class extends Controller {
         }
     }
 
-    // Metoda do czyszczenia błędów w kontenerze
     clearErrors(errorContainer) {
         errorContainer.innerHTML = '';
     }
 
-    // Pozostawiamy submitForm bez zmian, ponieważ dotyczy formularza zadań
+    // ========== WYSYŁANIE FORMULARZY ==========
     async submitForm(event) {
         event.preventDefault();
 
@@ -224,7 +261,7 @@ export default class extends Controller {
         const formData = new FormData(form);
 
         try {
-            const response = await fetch(`/task/${this.editTaskIdTarget.value}/edit`, { // Użyj wartości z targetu bezpośrednio
+            const response = await fetch(`/task/${this.editTaskIdTarget.value}/edit`, {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -254,6 +291,124 @@ export default class extends Controller {
         }
     }
 
+    async submitAddBoardForm(event) {
+        event.preventDefault();
+
+        if (!this.hasAddBoardFormTarget) {
+            console.error("Missing addBoardForm target.");
+            return;
+        }
+        const form = this.addBoardFormTarget;
+        const formData = new FormData(form);
+        const boardName = formData.get('name');
+
+        if (this.hasAddBoardErrorsTarget) {
+            this.clearErrors(this.addBoardErrorsTarget);
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method: form.method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ name: boardName }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (this.hasAddBoardErrorsTarget) {
+                    this.displayErrors(this.addBoardErrorsTarget, data.errors || [data.message || 'Wystąpił nieznany błąd.']);
+                } else {
+                    console.error("Błąd dodawania tablicy:", data);
+                }
+                return;
+            }
+
+            console.log('Tablica dodana pomyślnie:', data);
+            this.closeAddBoardModal();
+            window.location.reload();
+
+        } catch (error) {
+            console.error('Error submitting add board form:', error);
+            if (this.hasAddBoardErrorsTarget) {
+                this.displayErrors(this.addBoardErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
+            }
+        }
+    }
+
+    async submitAddColumnForm(event) {
+        event.preventDefault();
+
+        if (!this.hasAddColumnFormTarget) {
+            console.error("Missing addColumnForm target.");
+            return;
+        }
+
+        const form = this.addColumnFormTarget;
+        const formData = new FormData(form);
+        const columnName = formData.get('name');
+
+        // Pobierz boardId z kontrolera drag-drop
+        const dragDropController = this.application.getControllerForElementAndIdentifier(
+            document.querySelector('[data-controller*="drag-drop"]'), 
+            'drag-drop'
+        );
+        const boardId = dragDropController?.element?.dataset?.boardId;
+
+        if (!boardId) {
+            console.error("Nie można znaleźć boardId");
+            if (this.hasAddColumnErrorsTarget) {
+                this.displayErrors(this.addColumnErrorsTarget, ['Nie można znaleźć ID tablicy.']);
+            }
+            return;
+        }
+
+        if (this.hasAddColumnErrorsTarget) {
+            this.clearErrors(this.addColumnErrorsTarget);
+        }
+
+        try {
+            const response = await fetch(`/board/${boardId}/column/add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ name: columnName }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (this.hasAddColumnErrorsTarget) {
+                    this.displayErrors(this.addColumnErrorsTarget, data.errors || [data.message || 'Wystąpił nieznany błąd.']);
+                } else {
+                    console.error("Błąd dodawania kolumny:", data);
+                }
+                return;
+            }
+
+            console.log('Kolumna dodana pomyślnie:', data);
+            this.closeAddColumnModal();
+            
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else {
+                window.location.reload();
+            }
+
+        } catch (error) {
+            console.error('Error submitting add column form:', error);
+            if (this.hasAddColumnErrorsTarget) {
+                this.displayErrors(this.addColumnErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
+            }
+        }
+    }
+
+    // ========== USUWANIE ==========
     async deleteTask(event) {
         event.preventDefault();
         if (!confirm('Czy na pewno chcesz usunąć to zadanie?')) {
@@ -323,57 +478,6 @@ export default class extends Controller {
         } catch (error) {
             console.error('Error deleting board:', error);
             alert('Wystąpił błąd sieci lub serwera podczas usuwania tablicy.');
-        }
-    }
-
-    async submitAddBoardForm(event) {
-        event.preventDefault();
-
-        if (!this.hasAddBoardFormTarget) {
-            console.error("Missing addBoardForm target."); // To już nie powinno się pokazać po zmianie HTML
-            return;
-        }
-        const form = this.addBoardFormTarget;
-        const formData = new FormData(form);
-        const boardName = formData.get('name'); // Pobierz wartość z pola input o nazwie 'name'
-
-        // Oczyść poprzednie błędy
-        if (this.hasAddBoardErrorsTarget) {
-            this.clearErrors(this.addBoardErrorsTarget);
-        }
-
-        try {
-            const response = await fetch(form.action, {
-                method: form.method,
-                // WAŻNA ZMIANA: Wysyłaj jako JSON, a nie FormData dla API
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest' // Dodatkowe nagłówek dla Symfony
-                },
-                body: JSON.stringify({ name: boardName }), // Wysyłaj obiekt JSON z nazwą tablicy
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) { // Sprawdź, czy odpowiedź nie jest sukcesem (np. status 4xx, 5xx)
-                if (this.hasAddBoardErrorsTarget) {
-                    this.displayErrors(this.addBoardErrorsTarget, data.errors || [data.message || 'Wystąpił nieznany błąd.']);
-                } else {
-                    console.error("Błąd dodawania tablicy:", data);
-                }
-                return;
-            }
-
-            // Sukces
-            console.log('Tablica dodana pomyślnie:', data);
-            this.closeAddBoardModal();
-            window.location.reload(); // Przeładuj stronę, aby nowa tablica była widoczna
-
-        } catch (error) {
-            console.error('Error submitting add board form:', error);
-            if (this.hasAddBoardErrorsTarget) {
-                this.displayErrors(this.addBoardErrorsTarget, ['Wystąpił błąd sieci lub serwera.']);
-            }
         }
     }
 }

@@ -172,8 +172,14 @@ export default class extends Controller {
         const columnElement = event.currentTarget.closest('[data-drag-drop-target="column"]');
         const colId = columnElement.dataset.colId;
         const colName = columnElement.querySelector('[data-drag-drop-target="columnTitle"]')?.textContent || 'this column';
+        const taskCount = columnElement.querySelectorAll('[data-drag-drop-target="card"]').length;
 
-        if (!confirm(`Czy na pewno chcesz usunąć kolumnę "${colName}"?`)) {
+        let confirmMessage = `Czy na pewno chcesz usunąć kolumnę "${colName}"?`;
+        if (taskCount > 0) {
+            confirmMessage += `\n\nUWAGA: Kolumna zawiera ${taskCount} zadań, które również zostaną usunięte!`;
+        }
+
+        if (!confirm(confirmMessage)) {
             return;
         }
 
@@ -328,43 +334,7 @@ export default class extends Controller {
         }
     }
 
-    // Add new column functionality
-    async addColumn(event) {
-        event.preventDefault();
-        const boardId = this.element.dataset.boardId;
-        const columnName = prompt('Podaj nazwę kolumny:');
-        
-        if (!columnName || !columnName.trim()) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/board/${boardId}/column/add`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ name: columnName.trim() })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                this.showSuccess('Kolumna dodana pomyślnie!');
-                if (data.redirect) {
-                    setTimeout(() => window.location.href = data.redirect, 1000);
-                } else {
-                    window.location.reload();
-                }
-            } else {
-                alert('Błąd: ' + (data.errors ? data.errors.join(', ') : 'Nieznany błąd'));
-            }
-        } catch (error) {
-            console.error('Error adding column:', error);
-            alert('Wystąpił błąd podczas dodawania kolumny.');
-        }
-    }
+    // USUNIĘTO METODĘ addColumn - teraz obsługiwana przez modal_controller
 
     // ========== UTILITY METHODS ==========
     updateTaskCounts() {

@@ -6,8 +6,16 @@
 {% block body %}
 {# Usuń div z kontenerem i umieść zawartość bezpośrednio #}
 <div class="kanban-board-container">
-    <div class="kanban-board-title">
+    <div class="kanban-board-title flex justify-between items-center">
         <h2 class="text-2xl font-bold">{{ board.name }}</h2>
+        {# Przycisk dodawania kolumny w prawym górnym rogu #}
+        <button data-action="click->modal#openAddColumnModal"
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Dodaj kolumnę
+        </button>
     </div>
 
     {# Kontroler drag-drop z board-id #}
@@ -71,7 +79,11 @@
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
-                                    Usuń kolumnę
+                                    {% if col.tasks|length > 0 %}
+                                        Usuń kolumnę ({{ col.tasks|length }} zadań)
+                                    {% else %}
+                                        Usuń kolumnę
+                                    {% endif %}
                                 </button>
                                 {% endif %}
                             </div>
@@ -124,20 +136,49 @@
             </div>
         </div>
     {% endfor %}
+</div>
 
-    {# Placeholder do dodawania kolumn #}
-    <div class="min-w-80 flex-shrink-0">
-        <button data-action="click->drag-drop#addColumn"
-                class="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 flex flex-col items-center justify-center text-gray-500 hover:text-gray-600">
-            <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-            </svg>
-            <span class="text-sm font-medium">Dodaj kolumnę</span>
-        </button>
+{# Modale #}
+
+{# Modal do dodawania kolumn #}
+<div data-modal-target="addColumnModal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold mb-4">Dodaj nową kolumnę</h3>
+
+        <form data-modal-target="addColumnForm"
+              data-action="submit->modal#submitAddColumnForm"
+              method="post">
+
+            <div class="mb-4">
+                <label for="column_name" class="block text-sm font-medium text-gray-700 mb-2">
+                    Nazwa kolumny
+                </label>
+                <input type="text"
+                       id="column_name"
+                       name="name"
+                       required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Wprowadź nazwę kolumny">
+            </div>
+            
+            <div data-modal-target="addColumnErrors" class="text-red-600 text-sm mb-4"></div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button"
+                        data-action="click->modal#closeAddColumnModal"
+                        class="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+                    Anuluj
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                    Dodaj kolumnę
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
-{# Modale dla zadań (bez zmian) #}
 {# Modal do dodawania zadań #}
 <div data-modal-target="modal"
      class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">

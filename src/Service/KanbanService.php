@@ -31,9 +31,8 @@ class KanbanService
 
     // ========== BOARD OPERATIONS ==========
     
-    public function createBoard(User $user, string $name, array $columnNames = null): Board
+    public function createBoard(User $user, string $name): Board
     {
-        $columnNames = $columnNames ?? ['Do zrobienia', 'W trakcie', 'Ukończone'];
         
         $this->entityManager->beginTransaction();
         
@@ -45,14 +44,6 @@ class KanbanService
             $this->entityManager->persist($board);
             $this->entityManager->flush(); // Get board ID
             
-            // Create default columns
-            foreach ($columnNames as $position => $columnName) {
-                $column = new Col();
-                $column->setName($columnName);
-                $column->setPosition($position);
-                $column->setBoard($board);
-                $this->entityManager->persist($column);
-            }
             
             $this->entityManager->flush();
             $this->entityManager->commit();
@@ -87,7 +78,7 @@ class KanbanService
     public function getUserBoards(User $user): array
     {
         return $this->cacheService->getUserBoards($user->getId(), function() use ($user) {
-            return $this->boardRepository->findUserBoardsWithCounts($user);
+            return $this->boardRepository->findBy(['owner' => $user], ['createdAt' => 'DESC']);
         });
     }
     
@@ -137,11 +128,40 @@ class KanbanService
         $this->entityManager->beginTransaction();
         
         try {
-            $this->colRepository->updateColumnPositions($column, $newPosition);
+            $oldPosition = $column->getPosition();
+            $board = $column->getBoard();
+
+            // Pobierz wszystkie kolumny dla tej tablicy
+            $columns = $this->colRepository->findBy(['board' => $board], ['position' => 'ASC']);
+
+            // Reorganizuj pozycje innych kolumn
+            if ($newPosition > $oldPosition) {
+                // Przenosząc w prawo - zmniejsz pozycje kolumn między starą a nową pozycją
+                foreach ($columns as $col) {
+                    $pos = $col->getPosition();
+                    if ($pos > $oldPosition && $pos <= $newPosition && $col->getId() !== $column->getId()) {
+                        $col->setPosition($pos - 1);
+                    }
+                }
+            } else {
+                // Przenosząc w lewo - zwiększ pozycje kolumn między nową a starą pozycją
+                foreach ($columns as $col) {
+                    $pos = $col->getPosition();
+                    if ($pos >= $newPosition && $pos < $oldPosition && $col->getId() !== $column->getId()) {
+                        $col->setPosition($pos + 1);
+                    }
+                }
+            }
+
+            // Ustaw nową pozycję dla przenoszonej kolumny
+            $column->setPosition($newPosition);
+            
+            // WAŻNE: Flush wszystkie zmiany do bazy danych
+            $this->entityManager->flush();
             $this->entityManager->commit();
             
             // Clear cache
-            $this->cacheService->invalidateBoardCache($column->getBoard());
+            $this->cacheService->invalidateBoardCache($board);
             
             // Dispatch event
             $this->eventDispatcher->dispatch(new ColumnUpdatedEvent($column), ColumnUpdatedEvent::NAME);
@@ -171,13 +191,11 @@ class KanbanService
         // Check if it's not the last column
         $columnsCount = $this->colRepository->count(['board' => $board]);
         if ($columnsCount <= 1) {
-            throw new \LogicException('Cannot delete the last column from a board');
+            throw new \LogicException('Nie można usunąć ostatniej kolumny z tablicy.');
         }
         
-        // Check if column has tasks
-        if ($column->getTasks()->count() > 0) {
-            throw new \LogicException('Cannot delete column with tasks. Move tasks first.');
-        }
+        // USUNIĘTO sprawdzanie czy kolumna ma zadania - teraz można usuwać kolumny z zadaniami
+        // Zadania będą automatycznie usunięte przez orphanRemoval: true w relacji
         
         $this->entityManager->beginTransaction();
         
@@ -186,8 +204,19 @@ class KanbanService
             $this->entityManager->remove($column);
             
             // Update positions of remaining columns
-            $this->colRepository->decrementPositionsAfter($board, $oldPosition);
+            $remainingColumns = $this->colRepository->createQueryBuilder('c')
+                ->where('c.board = :board')
+                ->andWhere('c.position > :position')
+                ->setParameter('board', $board)
+                ->setParameter('position', $oldPosition)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($remainingColumns as $col) {
+                $col->setPosition($col->getPosition() - 1);
+            }
             
+            $this->entityManager->flush();
             $this->entityManager->commit();
             
             // Clear cache
@@ -273,35 +302,44 @@ class KanbanService
     public function getUserStatistics(User $user): array
     {
         return $this->cacheService->getUserStats($user->getId(), function() use ($user) {
+            $totalTasks = 0;
+            $boards = $this->boardRepository->findBy(['owner' => $user]);
+            
+            foreach ($boards as $board) {
+                foreach ($board->getCols() as $col) {
+                    $totalTasks += $col->getTasks()->count();
+                }
+            }
+            
             return [
-                'boardCount' => $this->boardRepository->count(['owner' => $user]),
-                'totalColumns' => $this->colRepository->createQueryBuilder('c')
-                    ->select('COUNT(c.id)')
-                    ->join('c.board', 'b')
-                    ->where('b.owner = :user')
-                    ->setParameter('user', $user)
-                    ->getQuery()
-                    ->getSingleScalarResult(),
-                'totalTasks' => $this->taskRepository->createQueryBuilder('t')
-                    ->select('COUNT(t.id)')
-                    ->join('t.col', 'c')
-                    ->join('c.board', 'b')
-                    ->where('b.owner = :user')
-                    ->setParameter('user', $user)
-                    ->getQuery()
-                    ->getSingleScalarResult(),
-                'recentTasks' => $this->taskRepository->findRecentTasksForUser($user, 5)
+                'boardCount' => count($boards),
+                'totalColumns' => array_sum(array_map(fn($board) => $board->getCols()->count(), $boards)),
+                'totalTasks' => $totalTasks
             ];
         });
     }
     
     public function searchTasks(User $user, string $searchTerm): array
     {
-        return $this->taskRepository->searchUserTasks($user, $searchTerm);
+        return $this->taskRepository->createQueryBuilder('t')
+            ->join('t.col', 'c')
+            ->join('c.board', 'b')
+            ->where('b.owner = :user')
+            ->andWhere('t.title LIKE :searchTerm OR t.description LIKE :searchTerm')
+            ->setParameter('user', $user)
+            ->setParameter('searchTerm', '%' . $searchTerm . '%')
+            ->orderBy('t.createdAt', 'DESC')
+            ->setMaxResults(50)
+            ->getQuery()
+            ->getResult();
     }
     
     public function getBoardStatistics(Board $board): array
     {
-        return $this->taskRepository->getBoardTaskStatistics($board);
+        $statistics = [];
+        foreach ($board->getCols() as $col) {
+            $statistics[$col->getName()] = $col->getTasks()->count();
+        }
+        return $statistics;
     }
 }

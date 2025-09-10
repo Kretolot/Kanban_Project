@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\BoardRepository;
 use App\Repository\ColRepository;
 use App\Repository\TaskRepository;
+use App\Service\KanbanService; // Dodaj import
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,13 +22,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class KanbanController extends AbstractController
 {
-   // private array $defaultColNames = ['Do zrobienia', 'W trakcie', 'Ukończone'];
-
     public function __construct(
         private EntityManagerInterface $entityManager,
         private BoardRepository $boardRepository,
         private ColRepository $colRepository,
-        private TaskRepository $taskRepository
+        private TaskRepository $taskRepository,
+        private KanbanService $kanbanService // Dodaj KanbanService
     ) {}
 
     #[Route('/home', name: 'app_home')]
@@ -79,34 +79,9 @@ class KanbanController extends AbstractController
             );
         }
 
-        $board = new Board();
-        $board->setName($boardName);
-        $board->setOwner($user);
-
-        $errors = $validator->validate($board);
-
-        if (count($errors) > 0) {
-            return $this->handleValidationErrors($errors, $request);
-        }
-
         try {
-            $this->entityManager->beginTransaction();
-            
-            $this->entityManager->persist($board);
-            $this->entityManager->flush();
-
-            // Create default columns in bulk
-           /* foreach ($this->defaultColNames as $position => $colName) {
-                $col = new Col();
-                $col->setName($colName);
-                $col->setPosition($position);
-                $col->setBoard($board);
-                $this->entityManager->persist($col);
-            }
-                */
-
-            $this->entityManager->flush();
-            $this->entityManager->commit();
+            // Użyj KanbanService zamiast duplikować logikę
+            $board = $this->kanbanService->createBoard($user, $boardName);
 
             if ($request->isXmlHttpRequest()) {
                 return new JsonResponse([
@@ -120,8 +95,6 @@ class KanbanController extends AbstractController
             return $this->redirectToRoute('app_home');
 
         } catch (\Exception $e) {
-            $this->entityManager->rollback();
-            
             return $this->handleError(
                 'Wystąpił błąd podczas tworzenia tablicy.',
                 $request
@@ -139,16 +112,12 @@ class KanbanController extends AbstractController
         }
 
         try {
-            $this->entityManager->beginTransaction();
-            $this->entityManager->remove($board);
-            $this->entityManager->flush();
-            $this->entityManager->commit();
+            $this->kanbanService->deleteBoard($board);
 
             $this->addFlash('success', 'Tablica "' . $board->getName() . '" została pomyślnie usunięta.');
             return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('app_home')], JsonResponse::HTTP_OK);
             
         } catch (\Exception $e) {
-            $this->entityManager->rollback();
             return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania tablicy: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -175,27 +144,7 @@ class KanbanController extends AbstractController
         }
 
         try {
-            // Find max position
-            $maxPosition = $this->colRepository->createQueryBuilder('c')
-                ->select('MAX(c.position)')
-                ->where('c.board = :board')
-                ->setParameter('board', $board)
-                ->getQuery()
-                ->getSingleScalarResult();
-            
-            $col = new Col();
-            $col->setName($colName);
-            $col->setPosition(($maxPosition ?? -1) + 1);
-            $col->setBoard($board);
-
-            $errors = $validator->validate($col);
-
-            if (count($errors) > 0) {
-                return $this->handleValidationErrors($errors, $request);
-            }
-
-            $this->entityManager->persist($col);
-            $this->entityManager->flush();
+            $col = $this->kanbanService->addColumn($board, $colName);
 
             if ($request->isXmlHttpRequest()) {
                 return new JsonResponse([
@@ -230,42 +179,13 @@ class KanbanController extends AbstractController
         }
 
         try {
-            $this->entityManager->beginTransaction();
+            // Użyj KanbanService zamiast duplikować logikę
+            $this->kanbanService->moveColumn($col, (int)$newPosition);
             
-            $oldPosition = $col->getPosition();
-            $board = $col->getBoard();
-
-            // Get all columns for this board
-            $columns = $this->colRepository->findBy(['board' => $board], ['position' => 'ASC']);
-
-            // Reorganize positions
-            if ($newPosition > $oldPosition) {
-                // Moving right
-                foreach ($columns as $column) {
-                    $pos = $column->getPosition();
-                    if ($pos > $oldPosition && $pos <= $newPosition) {
-                        $column->setPosition($pos - 1);
-                    }
-                }
-            } else {
-                // Moving left
-                foreach ($columns as $column) {
-                    $pos = $column->getPosition();
-                    if ($pos >= $newPosition && $pos < $oldPosition) {
-                        $column->setPosition($pos + 1);
-                    }
-                }
-            }
-
-            $col->setPosition($newPosition);
-            
-            $this->entityManager->commit();
-
             return new JsonResponse(['status' => 'success'], JsonResponse::HTTP_OK);
 
         } catch (\Exception $e) {
-            $this->entityManager->rollback();
-            return new JsonResponse(['error' => 'Wystąpił błąd podczas przenoszenia kolumny.'], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => 'Wystąpił błąd podczas przenoszenia kolumny: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -278,46 +198,16 @@ class KanbanController extends AbstractController
             return new JsonResponse(['error' => 'Nie masz uprawnień do usunięcia tej kolumny.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
-        $board = $col->getBoard();
-        $boardId = $board->getId();
-
-        // Check if it's not the last column
-        $columnsCount = $this->colRepository->count(['board' => $board]);
-        if ($columnsCount <= 1) {
-            return new JsonResponse(['error' => 'Nie można usunąć ostatniej kolumny z tablicy.'], JsonResponse::HTTP_BAD_REQUEST);
-        }
-
         try {
-            $this->entityManager->beginTransaction();
-
-            // Check if column has tasks
-            if ($col->getTasks()->count() > 0) {
-                return new JsonResponse(['error' => 'Nie można usunąć kolumny zawierającej zadania. Przenieś najpierw zadania do innej kolumny.'], JsonResponse::HTTP_BAD_REQUEST);
-            }
-
-            $oldPosition = $col->getPosition();
-            $this->entityManager->remove($col);
-
-            // Update positions of remaining columns
-            $remainingColumns = $this->colRepository->createQueryBuilder('c')
-                ->where('c.board = :board')
-                ->andWhere('c.position > :position')
-                ->setParameter('board', $board)
-                ->setParameter('position', $oldPosition)
-                ->getQuery()
-                ->getResult();
-
-            foreach ($remainingColumns as $column) {
-                $column->setPosition($column->getPosition() - 1);
-            }
-
-            $this->entityManager->commit();
+            $boardId = $col->getBoard()->getId();
+            $this->kanbanService->deleteColumn($col);
 
             $this->addFlash('success', 'Kolumna "' . $col->getName() . '" została pomyślnie usunięta.');
             return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])], JsonResponse::HTTP_OK);
 
+        } catch (\LogicException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], JsonResponse::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
-            $this->entityManager->rollback();
             return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania kolumny: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -342,15 +232,7 @@ class KanbanController extends AbstractController
         }
 
         try {
-            $col->setName($name);
-
-            $errors = $validator->validate($col);
-
-            if (count($errors) > 0) {
-                return $this->handleValidationErrors($errors, $request);
-            }
-
-            $this->entityManager->flush();
+            $this->kanbanService->updateColumnName($col, $name);
 
             if ($request->isXmlHttpRequest()) {
                 return new JsonResponse([
@@ -386,13 +268,8 @@ class KanbanController extends AbstractController
         }
 
         try {
-            $task->setCol($newCol);
-
-            if (isset($data['position'])) {
-                $task->setPosition($data['position']);
-            }
-
-            $this->entityManager->flush();
+            $newPosition = isset($data['position']) ? (int)$data['position'] : null;
+            $this->kanbanService->moveTask($task, $newCol, $newPosition);
 
             return new JsonResponse(['status' => 'success'], JsonResponse::HTTP_OK);
 
@@ -423,21 +300,8 @@ class KanbanController extends AbstractController
             );
         }
 
-        $task = new Task();
-        $task->setTitle($title);
-        $task->setDescription($description);
-        $task->setCol($col);
-        $task->setPosition($col->getTasks()->count());
-
-        $errors = $validator->validate($task);
-
-        if (count($errors) > 0) {
-            return $this->handleValidationErrors($errors, $request);
-        }
-
         try {
-            $this->entityManager->persist($task);
-            $this->entityManager->flush();
+            $task = $this->kanbanService->createTask($col, $title, $description);
 
             if ($request->isXmlHttpRequest()) {
                 return new JsonResponse([
@@ -470,37 +334,26 @@ class KanbanController extends AbstractController
             $title = $request->request->get('title');
             $description = $request->request->get('description');
 
-            $task->setTitle($title);
-            $task->setDescription($description);
-
-            $errors = $validator->validate($task);
-
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[] = $error->getMessage();
-                }
+            try {
+                $this->kanbanService->updateTask($task, $title, $description);
 
                 if ($request->isXmlHttpRequest()) {
-                    return new JsonResponse(['success' => false, 'errors' => $errorMessages], JsonResponse::HTTP_BAD_REQUEST);
+                    return new JsonResponse([
+                        'success' => true,
+                        'message' => 'Zadanie zaktualizowane pomyślnie!',
+                        'redirect' => $this->generateUrl('kanban_board', ['id' => $task->getCol()->getBoard()->getId()])
+                    ], JsonResponse::HTTP_OK);
+                }
+                return $this->redirectToRoute('kanban_board', ['id' => $task->getCol()->getBoard()->getId()]);
+                
+            } catch (\Exception $e) {
+                if ($request->isXmlHttpRequest()) {
+                    return new JsonResponse(['success' => false, 'errors' => [$e->getMessage()]], JsonResponse::HTTP_BAD_REQUEST);
                 } else {
-                    foreach ($errors as $error) {
-                        $this->addFlash('error', $error->getMessage());
-                    }
+                    $this->addFlash('error', $e->getMessage());
                     return $this->redirectToRoute('kanban_board', ['id' => $task->getCol()->getBoard()->getId()]);
                 }
             }
-
-            $this->entityManager->flush();
-
-            if ($request->isXmlHttpRequest()) {
-                return new JsonResponse([
-                    'success' => true,
-                    'message' => 'Zadanie zaktualizowane pomyślnie!',
-                    'redirect' => $this->generateUrl('kanban_board', ['id' => $task->getCol()->getBoard()->getId()])
-                ], JsonResponse::HTTP_OK);
-            }
-            return $this->redirectToRoute('kanban_board', ['id' => $task->getCol()->getBoard()->getId()]);
         }
 
         if ($request->isXmlHttpRequest()) {
@@ -520,8 +373,7 @@ class KanbanController extends AbstractController
 
         try {
             $boardId = $task->getCol()->getBoard()->getId();
-            $this->entityManager->remove($task);
-            $this->entityManager->flush();
+            $this->kanbanService->deleteTask($task);
 
             $this->addFlash('success', 'Zadanie zostało pomyślnie usunięte.');
             return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])], JsonResponse::HTTP_OK);
