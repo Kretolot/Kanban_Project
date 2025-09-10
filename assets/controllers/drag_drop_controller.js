@@ -12,7 +12,7 @@ export default class extends Controller {
         this.makeColumnsDroppable();
     }
 
-    // ========== EXISTING TASK DRAG & DROP ==========
+    // ========== TASK DRAG & DROP ==========
     makeDraggable() {
         this.cardTargets.forEach(card => {
             card.draggable = true;
@@ -166,12 +166,12 @@ export default class extends Controller {
         }
     }
 
-    // ========== COLUMN ACTIONS ==========
+    // ========== COLUMN ACTIONS - SZYBKIE USUWANIE ==========
     async deleteColumn(event) {
         event.preventDefault();
         const columnElement = event.currentTarget.closest('[data-drag-drop-target="column"]');
         const colId = columnElement.dataset.colId;
-        const colName = columnElement.querySelector('[data-drag-drop-target="columnTitle"]')?.textContent || 'this column';
+        const colName = columnElement.querySelector('[data-drag-drop-target="columnTitle"]')?.textContent || 'tę kolumnę';
         const taskCount = columnElement.querySelectorAll('[data-drag-drop-target="card"]').length;
 
         let confirmMessage = `Czy na pewno chcesz usunąć kolumnę "${colName}"?`;
@@ -182,6 +182,15 @@ export default class extends Controller {
         if (!confirm(confirmMessage)) {
             return;
         }
+
+        // ⚡ SZYBKIE USUWANIE - usuń z DOM natychmiast
+        const parent = columnElement.parentNode;
+        const nextSibling = columnElement.nextSibling;
+        const columnClone = columnElement.cloneNode(true);
+        
+        // Usuń kolumnę z DOM od razu (bez czekania na serwer)
+        columnElement.remove();
+        this.showNotification('Usuwanie kolumny...', 'info');
 
         try {
             const response = await fetch(`/column/${colId}`, {
@@ -194,18 +203,40 @@ export default class extends Controller {
             const data = await response.json();
 
             if (data.status === 'success') {
-                columnElement.remove();
-                this.showSuccess('Kolumna usunięta pomyślnie!');
+                this.showNotification('Kolumna usunięta pomyślnie!', 'success');
+                
+                // USUNIĘTO logikę sprawdzającą czy to była ostatnia kolumna
+                // Zawsze samo zachowanie - pokazuj sukces i opcjonalnie przekieruj
                 if (data.redirect) {
                     setTimeout(() => window.location.href = data.redirect, 1000);
                 }
             } else {
-                alert('Błąd: ' + (data.error || 'Nieznany błąd.'));
+                // W przypadku błędu serwera - przywróć kolumnę
+                this.restoreColumn(parent, columnClone, nextSibling);
+                this.showNotification('Błąd: ' + (data.error || 'Nieznany błąd.'), 'error');
             }
         } catch (error) {
             console.error('Error deleting column:', error);
-            alert('Wystąpił błąd podczas usuwania kolumny.');
+            // W przypadku błędu sieci - przywróć kolumnę
+            this.restoreColumn(parent, columnClone, nextSibling);
+            this.showNotification('Wystąpił błąd podczas usuwania kolumny.', 'error');
         }
+    }
+
+    
+    // Metoda pomocnicza do przywracania kolumny w przypadku błędu
+    restoreColumn(parent, columnClone, nextSibling) {
+        if (nextSibling) {
+            parent.insertBefore(columnClone, nextSibling);
+        } else {
+            parent.appendChild(columnClone);
+        }
+        
+        // Ponownie podepnij event listenery do przywróconej kolumny
+        this.makeColumnsDraggable();
+        this.makeColumnsDroppable();
+        this.makeDraggable();
+        this.makeDroppable();
     }
 
     editColumnName(event) {
@@ -213,13 +244,13 @@ export default class extends Controller {
         const currentName = columnTitle.textContent.trim();
         const colId = columnTitle.closest('[data-drag-drop-target="column"]').dataset.colId;
 
-        // Create input for editing
+        // Stwórz pole input do edycji
         const input = document.createElement('input');
         input.type = 'text';
         input.value = currentName;
         input.className = 'font-bold text-lg bg-transparent border-b-2 border-blue-500 focus:outline-none focus:border-blue-700 w-full';
         
-        // Replace title with input
+        // Zamień tytuł na input
         columnTitle.style.display = 'none';
         columnTitle.parentNode.insertBefore(input, columnTitle);
         input.focus();
@@ -269,13 +300,13 @@ export default class extends Controller {
             const data = await response.json();
 
             if (data.success) {
-                this.showSuccess('Nazwa kolumny zaktualizowana!');
+                this.showNotification('Nazwa kolumny zaktualizowana!', 'success');
             } else {
                 throw new Error(data.errors ? data.errors.join(', ') : 'Nieznany błąd');
             }
         } catch (error) {
             console.error('Error updating column name:', error);
-            alert(`Błąd: ${error.message}`);
+            this.showNotification(`Błąd: ${error.message}`, 'error');
         }
     }
 
@@ -298,12 +329,12 @@ export default class extends Controller {
                 const errorData = await response.json();
                 console.error('Error moving task:', errorData.error);
                 this.revertTaskMove();
-                alert(`Błąd: ${errorData.error || 'Nieznany błąd.'}`);
+                this.showNotification(`Błąd: ${errorData.error || 'Nieznany błąd.'}`, 'error');
             }
         } catch (error) {
             console.error('Network error:', error);
             this.revertTaskMove();
-            alert(`Błąd sieci: ${error.message}`);
+            this.showNotification(`Błąd sieci: ${error.message}`, 'error');
         }
     }
 
@@ -320,21 +351,19 @@ export default class extends Controller {
 
             if (response.ok) {
                 console.log('Column moved successfully');
-                this.showSuccess('Kolumna przeniesiona!');
+                this.showNotification('Kolumna przeniesiona!', 'success');
             } else {
                 const errorData = await response.json();
                 console.error('Error moving column:', errorData.error);
                 this.revertColumnMove();
-                alert(`Błąd: ${errorData.error || 'Nieznany błąd.'}`);
+                this.showNotification(`Błąd: ${errorData.error || 'Nieznany błąd.'}`, 'error');
             }
         } catch (error) {
             console.error('Network error:', error);
             this.revertColumnMove();
-            alert(`Błąd sieci: ${error.message}`);
+            this.showNotification(`Błąd sieci: ${error.message}`, 'error');
         }
     }
-
-    // USUNIĘTO METODĘ addColumn - teraz obsługiwana przez modal_controller
 
     // ========== UTILITY METHODS ==========
     updateTaskCounts() {
@@ -369,14 +398,53 @@ export default class extends Controller {
         }
     }
 
-    showSuccess(message) {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
-        successDiv.textContent = message;
-        document.body.appendChild(successDiv);
+    // ========== POWIADOMIENIA ==========
+    showNotification(message, type = 'success') {
+        // Usuń istniejące powiadomienie
+        const existing = document.querySelector('.notification-toast');
+        if (existing) {
+            existing.remove();
+        }
 
+        // Ustaw kolor na podstawie typu
+        let bgColor, iconSvg;
+        switch(type) {
+            case 'success':
+                bgColor = 'bg-green-500';
+                iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                break;
+            case 'error':
+                bgColor = 'bg-red-500';
+                iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                break;
+            case 'info':
+                bgColor = 'bg-blue-500';
+                iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                break;
+            default:
+                bgColor = 'bg-gray-500';
+                iconSvg = '';
+        }
+
+        const notification = document.createElement('div');
+        notification.className = `notification-toast fixed top-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center transform translate-x-full transition-transform duration-300 ease-out`;
+        notification.innerHTML = `${iconSvg}<span>${message}</span>`;
+        
+        document.body.appendChild(notification);
+
+        // Animacja pojawiania się
         setTimeout(() => {
-            successDiv.remove();
+            notification.style.transform = 'translateX(0)';
+        }, 10);
+
+        // Automatyczne ukrycie po 3 sekundach
+        setTimeout(() => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
         }, 3000);
     }
 }

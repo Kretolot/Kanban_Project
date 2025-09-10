@@ -33,7 +33,6 @@ class KanbanService
     
     public function createBoard(User $user, string $name): Board
     {
-        
         $this->entityManager->beginTransaction();
         
         try {
@@ -43,7 +42,6 @@ class KanbanService
             
             $this->entityManager->persist($board);
             $this->entityManager->flush(); // Get board ID
-            
             
             $this->entityManager->flush();
             $this->entityManager->commit();
@@ -82,17 +80,26 @@ class KanbanService
         });
     }
     
+    /**
+     * DODANE: Metoda usuwania tablicy wraz z wszystkimi kolumnami i zadaniami
+     */
     public function deleteBoard(Board $board): void
     {
         $this->entityManager->beginTransaction();
         
         try {
+            $owner = $board->getOwner();
+            
+            // Usuń tablicę (kolumny i zadania zostaną usunięte automatycznie przez orphanRemoval)
             $this->entityManager->remove($board);
             $this->entityManager->flush();
             $this->entityManager->commit();
             
-            // Clear caches
-            $this->cacheService->invalidateBoardCache($board);
+            // Clear cache
+            $this->cacheService->invalidateUserCache($owner);
+            
+            // Dispatch event
+            $this->eventDispatcher->dispatch(new BoardUpdatedEvent($board), BoardUpdatedEvent::NAME);
             
         } catch (\Exception $e) {
             $this->entityManager->rollback();
@@ -131,7 +138,7 @@ class KanbanService
             $oldPosition = $column->getPosition();
             $board = $column->getBoard();
 
-            // Pobierz wszystkie kolumny dla tej tablicy
+            // Pobierz wszystkie kolumny dla tej tablicy uporządkowane według pozycji
             $columns = $this->colRepository->findBy(['board' => $board], ['position' => 'ASC']);
 
             // Reorganizuj pozycje innych kolumn
@@ -156,7 +163,7 @@ class KanbanService
             // Ustaw nową pozycję dla przenoszonej kolumny
             $column->setPosition($newPosition);
             
-            // WAŻNE: Flush wszystkie zmiany do bazy danych
+            // KRYTYCZNE: Flush wszystkie zmiany do bazy danych
             $this->entityManager->flush();
             $this->entityManager->commit();
             
@@ -184,26 +191,26 @@ class KanbanService
         $this->eventDispatcher->dispatch(new ColumnUpdatedEvent($column), ColumnUpdatedEvent::NAME);
     }
     
+    /**
+     * POPRAWIONE: Umożliwia usuwanie kolumn wraz z zadaniami
+     * Usuwa także sprawdzanie czy to ostatnia kolumna
+     */
     public function deleteColumn(Col $column): void
     {
         $board = $column->getBoard();
         
-        // Check if it's not the last column
-        $columnsCount = $this->colRepository->count(['board' => $board]);
-        if ($columnsCount <= 1) {
-            throw new \LogicException('Nie można usunąć ostatniej kolumny z tablicy.');
-        }
-        
-        // USUNIĘTO sprawdzanie czy kolumna ma zadania - teraz można usuwać kolumny z zadaniami
-        // Zadania będą automatycznie usunięte przez orphanRemoval: true w relacji
+        // USUNIĘTO sprawdzanie czy kolumna zawiera zadania
+        // USUNIĘTO sprawdzanie czy to ostatnia kolumna - można usunąć nawet ostatnią
         
         $this->entityManager->beginTransaction();
         
         try {
             $oldPosition = $column->getPosition();
+            
+            // Usuń kolumnę (zadania będą automatycznie usunięte przez orphanRemoval: true)
             $this->entityManager->remove($column);
             
-            // Update positions of remaining columns
+            // Zaktualizuj pozycje pozostałych kolumn (jeśli jakieś są)
             $remainingColumns = $this->colRepository->createQueryBuilder('c')
                 ->where('c.board = :board')
                 ->andWhere('c.position > :position')
@@ -250,26 +257,103 @@ class KanbanService
         return $task;
     }
     
+    /**
+     * POPRAWIONE: Lepsze zarządzanie pozycjami zadań przy przenoszeniu
+     */
     public function moveTask(Task $task, Col $newColumn, int $newPosition = null): void
     {
-        $oldBoard = $task->getCol()->getBoard();
+        $this->entityManager->beginTransaction();
         
-        $task->setCol($newColumn);
-        
-        if ($newPosition !== null) {
-            $task->setPosition($newPosition);
+        try {
+            $oldColumn = $task->getCol();
+            $oldBoard = $oldColumn->getBoard();
+            $oldPosition = $task->getPosition();
+            
+            // Jeśli przenosimy do innej kolumny
+            if ($newColumn->getId() !== $oldColumn->getId()) {
+                // Usuń zadanie ze starej kolumny - zaktualizuj pozycje pozostałych
+                $remainingTasks = $this->taskRepository->createQueryBuilder('t')
+                    ->where('t.col = :col')
+                    ->andWhere('t.position > :position')
+                    ->setParameter('col', $oldColumn)
+                    ->setParameter('position', $oldPosition)
+                    ->getQuery()
+                    ->getResult();
+                
+                foreach ($remainingTasks as $remainingTask) {
+                    $remainingTask->setPosition($remainingTask->getPosition() - 1);
+                }
+                
+                // Dodaj do nowej kolumny
+                $task->setCol($newColumn);
+                if ($newPosition !== null) {
+                    $task->setPosition($newPosition);
+                } else {
+                    $task->setPosition($newColumn->getTasks()->count());
+                }
+                
+                // Zaktualizuj pozycje zadań w nowej kolumnie
+                $newColumnTasks = $this->taskRepository->createQueryBuilder('t')
+                    ->where('t.col = :col')
+                    ->andWhere('t.position >= :position')
+                    ->andWhere('t.id != :taskId')
+                    ->setParameter('col', $newColumn)
+                    ->setParameter('position', $task->getPosition())
+                    ->setParameter('taskId', $task->getId())
+                    ->getQuery()
+                    ->getResult();
+                
+                foreach ($newColumnTasks as $colTask) {
+                    $colTask->setPosition($colTask->getPosition() + 1);
+                }
+            } else {
+                // Przenoszenie w ramach tej samej kolumny
+                if ($newPosition !== null && $newPosition !== $oldPosition) {
+                    $task->setPosition($newPosition);
+                    
+                    // Zaktualizuj pozycje innych zadań
+                    $columnTasks = $this->taskRepository->findBy(['col' => $newColumn], ['position' => 'ASC']);
+                    
+                    if ($newPosition > $oldPosition) {
+                        // Przenosząc w dół
+                        foreach ($columnTasks as $colTask) {
+                            if ($colTask->getId() !== $task->getId()) {
+                                $pos = $colTask->getPosition();
+                                if ($pos > $oldPosition && $pos <= $newPosition) {
+                                    $colTask->setPosition($pos - 1);
+                                }
+                            }
+                        }
+                    } else {
+                        // Przenosząc w górę
+                        foreach ($columnTasks as $colTask) {
+                            if ($colTask->getId() !== $task->getId()) {
+                                $pos = $colTask->getPosition();
+                                if ($pos >= $newPosition && $pos < $oldPosition) {
+                                    $colTask->setPosition($pos + 1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+            
+            // Clear cache for affected boards
+            $this->cacheService->invalidateBoardCache($oldBoard);
+            if ($newColumn->getBoard() !== $oldBoard) {
+                $this->cacheService->invalidateBoardCache($newColumn->getBoard());
+            }
+            
+            // Dispatch event
+            $this->eventDispatcher->dispatch(new TaskUpdatedEvent($task), TaskUpdatedEvent::NAME);
+            
+        } catch (\Exception $e) {
+            $this->entityManager->rollback();
+            throw $e;
         }
-        
-        $this->entityManager->flush();
-        
-        // Clear cache for affected boards
-        $this->cacheService->invalidateBoardCache($oldBoard);
-        if ($newColumn->getBoard() !== $oldBoard) {
-            $this->cacheService->invalidateBoardCache($newColumn->getBoard());
-        }
-        
-        // Dispatch event
-        $this->eventDispatcher->dispatch(new TaskUpdatedEvent($task), TaskUpdatedEvent::NAME);
     }
     
     public function updateTask(Task $task, string $title, string $description = null): void
@@ -289,12 +373,38 @@ class KanbanService
     public function deleteTask(Task $task): void
     {
         $board = $task->getCol()->getBoard();
+        $column = $task->getCol();
+        $position = $task->getPosition();
         
-        $this->entityManager->remove($task);
-        $this->entityManager->flush();
+        $this->entityManager->beginTransaction();
         
-        // Clear cache
-        $this->cacheService->invalidateBoardCache($board);
+        try {
+            // Usuń zadanie
+            $this->entityManager->remove($task);
+            
+            // Zaktualizuj pozycje pozostałych zadań w kolumnie
+            $remainingTasks = $this->taskRepository->createQueryBuilder('t')
+                ->where('t.col = :col')
+                ->andWhere('t.position > :position')
+                ->setParameter('col', $column)
+                ->setParameter('position', $position)
+                ->getQuery()
+                ->getResult();
+            
+            foreach ($remainingTasks as $remainingTask) {
+                $remainingTask->setPosition($remainingTask->getPosition() - 1);
+            }
+            
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+            
+            // Clear cache
+            $this->cacheService->invalidateBoardCache($board);
+            
+        } catch (\Exception $e) {
+            $this->entityManager->rollback();
+            throw $e;
+        }
     }
 
     // ========== STATISTICS AND SEARCH ==========

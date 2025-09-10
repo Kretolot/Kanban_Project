@@ -711,3 +711,79 @@ body {
         padding: 8px 10px;
     }
 }
+/* ===== DODAJ TE STYLE NA KONIEC PLIKU assets/styles/app.css ===== */
+
+/* Powiadomienia toast */
+.notification-toast {
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-weight: 500;
+    min-width: 250px;
+    max-width: 400px;
+    word-wrap: break-word;
+}
+
+.notification-toast.show {
+    transform: translateX(0);
+}
+
+/* Animacje usuwania kolumn */
+.column-deleting {
+    opacity: 0.5;
+    transform: scale(0.95);
+    transition: all 0.2s ease-out;
+    pointer-events: none;
+}
+
+.column-deleted {
+    opacity: 0;
+    transform: scale(0.8) translateY(-20px);
+    transition: all 0.3s ease-out;
+    pointer-events: none;
+}
+
+/* Stan pustej tablicy */
+.empty-board-message {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border-radius: 1rem;
+    border: 2px dashed #d1d5db;
+    margin: 2rem auto;
+    max-width: 600px;
+}
+
+.empty-board-message svg {
+    opacity: 0.6;
+    margin-bottom: 1rem;
+}
+
+.empty-board-message h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.empty-board-message p {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive dla powiadomień */
+@media (max-width: 768px) {
+    .notification-toast {
+        left: 1rem;
+        right: 1rem;
+        transform: translateY(-100%);
+        top: 1rem;
+        min-width: auto;
+    }
+    
+    .notification-toast.show {
+        transform: translateY(0);
+    }
+}

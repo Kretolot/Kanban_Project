@@ -27,7 +27,7 @@ class KanbanController extends AbstractController
         private BoardRepository $boardRepository,
         private ColRepository $colRepository,
         private TaskRepository $taskRepository,
-        private KanbanService $kanbanService // Dodaj KanbanService
+        private KanbanService $kanbanService
     ) {}
 
     #[Route('/home', name: 'app_home')]
@@ -189,7 +189,7 @@ class KanbanController extends AbstractController
         }
     }
 
-    #[Route('/column/{id}', name: 'kanban_delete_column', methods: ['DELETE'])]
+   #[Route('/column/{id}', name: 'kanban_delete_column', methods: ['DELETE'])]
     public function deleteColumn(Col $col): JsonResponse
     {
         /** @var User $user */
@@ -199,16 +199,26 @@ class KanbanController extends AbstractController
         }
 
         try {
-            $boardId = $col->getBoard()->getId();
+            $board = $col->getBoard();
+            $boardId = $board->getId();
+            $colName = $col->getName();
+            
+            // Usuń kolumnę (bez sprawdzania czy to ostatnia)
             $this->kanbanService->deleteColumn($col);
 
-            $this->addFlash('success', 'Kolumna "' . $col->getName() . '" została pomyślnie usunięta.');
-            return new JsonResponse(['status' => 'success', 'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])], JsonResponse::HTTP_OK);
+            $this->addFlash('success', 'Kolumna "' . $colName . '" została pomyślnie usunięta.');
+            
+            // USUNIĘTO logikę sprawdzania liczby kolumn i przekierowania na stronę główną
+            // Zawsze zwracaj tę samą odpowiedź
+            return new JsonResponse([
+                'status' => 'success', 
+                'redirect' => $this->generateUrl('kanban_board', ['id' => $boardId])
+            ], JsonResponse::HTTP_OK);
 
-        } catch (\LogicException $e) {
-            return new JsonResponse(['error' => $e->getMessage()], JsonResponse::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
-            return new JsonResponse(['error' => 'Wystąpił błąd podczas usuwania kolumny: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse([
+                'error' => 'Wystąpił błąd podczas usuwania kolumny: ' . $e->getMessage()
+            ], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
