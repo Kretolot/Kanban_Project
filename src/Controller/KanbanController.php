@@ -21,7 +21,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class KanbanController extends AbstractController
 {
-    private array $defaultColNames = ['Do zrobienia', 'W trakcie', 'Ukończone'];
+   // private array $defaultColNames = ['Do zrobienia', 'W trakcie', 'Ukończone'];
 
     public function __construct(
         private EntityManagerInterface $entityManager,
@@ -96,13 +96,14 @@ class KanbanController extends AbstractController
             $this->entityManager->flush();
 
             // Create default columns in bulk
-            foreach ($this->defaultColNames as $position => $colName) {
+           /* foreach ($this->defaultColNames as $position => $colName) {
                 $col = new Col();
                 $col->setName($colName);
                 $col->setPosition($position);
                 $col->setBoard($board);
                 $this->entityManager->persist($col);
             }
+                */
 
             $this->entityManager->flush();
             $this->entityManager->commit();
