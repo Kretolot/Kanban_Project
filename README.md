@@ -28,7 +28,7 @@ Pozwala użytkownikom na tworzenie tablic, kolumn i zadań, które można łatwo
 1. Sklonuj repozytorium:
 ```bash
 git clone [link do repozytorium]
-cd kanban-projekt
+cd kanban_project
 ```
 
 2. Zainstaluj zależności:
@@ -52,30 +52,7 @@ symfony server:start
 http://127.0.0.1:8000
 ```
 
-## Technologie
 
-- Backend: Symfony 7.3
-- Frontend: Stimulus.js, Tailwind CSS
-- Baza danych: SQLite
-- Autentykacja: Symfony Security
-- Walidacja: Symfony Validator
-
-
-
-## Struktura projektu
-
-```
-├── assets/           # Pliki JavaScript i CSS
-├── config/           # Konfiguracja Symfony
-├── migrations/       # Migracje bazy danych
-├── public/           # Publiczny katalog www
-├── src/              # Główny kod źródłowy
-│   ├── Controller/   # Kontrolery
-│   ├── Entity/       # Modele danych
-│   ├── Repository/   # Repozytoria
-│   └── Service/      # Usługi biznesowe
-└── templates/        # Szablony Twig
-```
 
 ## Autorzy
 
